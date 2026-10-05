@@ -7,7 +7,12 @@ function handlePrevention(session, normalizedMessage, context) {
             "Propuesta preventiva vacía"
         );
 
-        return;
+        return {
+            reply:
+                "⚠️ Necesito que indiques una acción o medida preventiva.\n\n" +
+                "Ejemplo:\n" +
+                "Limpiar el derrame y colocar material antiderrapante."
+        };
     }
 
     session.data.prevention =
@@ -26,6 +31,14 @@ function handlePrevention(session, normalizedMessage, context) {
     context.log(
         "Cambio de estado: PREVENTION -> MEDIA_DECISION"
     );
+
+    return {
+        reply:
+            "✅ Medida preventiva registrada.\n\n" +
+            "¿Deseas agregar fotografías como evidencia?\n\n" +
+            "1. Sí\n" +
+            "2. No, enviar reporte"
+    };
 
 }
 

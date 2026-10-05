@@ -75,7 +75,11 @@ async function processSession(session, normalizedMessage, context) {
     break;
 
     case "PREVENTION":
-        handlePrevention(session, normalizedMessage, context);
+        result = handlePrevention(
+            session,
+            normalizedMessage,
+            context
+        );
     break;
 
     case "MEDIA_DECISION": {
