@@ -15,9 +15,7 @@ const handleOtherConsequence =
     require("../states/otherConsequence");
 const handleConsequence =
     require("../states/consequence");
-const parseConsequences = require("../utils/parseConsequences");
 const submitReport = require("../services/submitReport");
-const { ALLOWED_IMAGE_TYPES } = require("../config/constants");
 
 async function processSession(session, normalizedMessage, context) {
     switch (session.state) {
