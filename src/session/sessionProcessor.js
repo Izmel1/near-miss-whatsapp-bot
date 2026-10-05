@@ -18,10 +18,11 @@ const handleConsequence =
 const submitReport = require("../services/submitReport");
 
 async function processSession(session, normalizedMessage, context) {
+    let result;
     switch (session.state) {
 
         case "START":
-            handleStart(session, context);
+            result = handleStart(session, context);
             break;
 
         case "IDENTITY":
@@ -90,6 +91,8 @@ default:
     }
 
     session.updatedAt = new Date();
+
+    return result;
 }
 
 module.exports = processSession;
