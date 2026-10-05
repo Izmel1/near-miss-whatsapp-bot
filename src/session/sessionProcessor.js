@@ -3,6 +3,8 @@ const handleIdentity = require("../states/identity");
 const handleArea = require("../states/area");
 const handleDescription = require("../states/description");
 const handleLocation = require("../states/location");
+const handleConsequence =
+    require("../states/consequence");
 const parseConsequences = require("../utils/parseConsequences");
 const submitReport = require("../services/submitReport");
 const { ALLOWED_IMAGE_TYPES } = require("../config/constants");
@@ -31,50 +33,7 @@ async function processSession(session, normalizedMessage, context) {
     break;
 
         case "CONSEQUENCE": {
-        const result = parseConsequences(
-        normalizedMessage.text
-    );
-
-    if (!result.valid) {
-        context.log(
-            "Consecuencia inválida:",
-            normalizedMessage.text
-        );
-
-        context.log(
-            "Opciones válidas: 1,2,3,4,5,6,7,8"
-        );
-
-        // No cambiamos de estado.
-        break;
-    }
-
-        session.data.consequences = result.values;
-        session.updatedAt = new Date();
-
-        context.log(
-        "Consecuencias guardadas:",
-        JSON.stringify(
-            session.data.consequences
-        )
-    );
-
-    if (
-        session.data.consequences.includes("Otro")
-    ) {
-        session.state = "OTHER_CONSEQUENCE";
-
-        context.log(
-            "Cambio de estado: CONSEQUENCE -> OTHER_CONSEQUENCE"
-        );
-    } else {
-        session.state = "PREVENTION";
-
-        context.log(
-            "Cambio de estado: CONSEQUENCE -> PREVENTION"
-        );
-    }
-
+            handleConsequence(session, normalizedMessage, context);
     break;
     }
 
