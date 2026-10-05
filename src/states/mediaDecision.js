@@ -15,7 +15,13 @@ function handleMediaDecision(session, normalizedMessage, context) {
             "Cambio de estado: MEDIA_DECISION -> MEDIA"
         );
 
-        return;
+        return {
+            reply:
+                "📷 Envía la primera fotografía como evidencia.\n\n" +
+                "Puedes agregar hasta 5 imágenes.\n\n" +
+                "Si cambias de opinión, también puedes escribir:\n" +
+                "Continuar sin foto"
+        };
     }
 
     if (option === "2") {
@@ -32,7 +38,12 @@ function handleMediaDecision(session, normalizedMessage, context) {
             "Cambio de estado: MEDIA_DECISION -> SUBMIT"
         );
 
-        return;
+        return {
+            reply:
+                "✅ Captura del Near Miss completada.\n\n" +
+                "El reporte está listo para su registro.\n\n" +
+                "La confirmación con folio se habilitará al integrar SharePoint."
+        };
     }
 
     context.log(
@@ -43,6 +54,14 @@ function handleMediaDecision(session, normalizedMessage, context) {
     context.log(
         "Opciones válidas: 1 = Sí, 2 = No"
     );
+
+    return {
+        reply:
+            "⚠️ Selecciona una opción válida.\n\n" +
+            "¿Deseas agregar fotografías como evidencia?\n\n" +
+            "1. Sí\n" +
+            "2. No, enviar reporte"
+    };
 
 }
 

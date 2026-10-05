@@ -83,7 +83,11 @@ async function processSession(session, normalizedMessage, context) {
     break;
 
     case "MEDIA_DECISION": {
-        handleMediaDecision(session, normalizedMessage, context);
+        result = handleMediaDecision(
+            session,
+            normalizedMessage,
+            context
+        );
     break;
 }
 
