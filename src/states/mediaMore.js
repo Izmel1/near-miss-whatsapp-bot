@@ -13,7 +13,11 @@ function handleMediaMore(session, normalizedMessage, context) {
             "Cambio de estado: MEDIA_MORE -> MEDIA"
         );
 
-        return;
+        return {
+            reply:
+                "📷 Envía la siguiente fotografía.\n\n" +
+                "Puedes agregar hasta 5 imágenes en total."
+        };
     }
 
     if (option === "2") {
@@ -28,7 +32,12 @@ function handleMediaMore(session, normalizedMessage, context) {
             "Cambio de estado: MEDIA_MORE -> SUBMIT"
         );
 
-        return;
+        return {
+            reply:
+                "✅ Captura del Near Miss completada.\n\n" +
+                "El reporte está listo para su registro.\n\n" +
+                "La confirmación con folio se habilitará al integrar SharePoint."
+        };
     }
 
     context.log(
@@ -39,6 +48,14 @@ function handleMediaMore(session, normalizedMessage, context) {
     context.log(
         "Opciones válidas: 1 = Sí, 2 = Enviar reporte"
     );
+
+    return {
+        reply:
+            "⚠️ Selecciona una opción válida.\n\n" +
+            "¿Deseas agregar más imágenes?\n\n" +
+            "1. Sí\n" +
+            "2. Enviar reporte"
+    };
 
 }
 

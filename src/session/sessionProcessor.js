@@ -100,7 +100,11 @@ async function processSession(session, normalizedMessage, context) {
     break;
 }
     case "MEDIA_MORE": {
-        handleMediaMore(session, normalizedMessage, context);
+        result = handleMediaMore(
+            session,
+            normalizedMessage,
+            context
+        );
     break;
 }
 
