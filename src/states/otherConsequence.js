@@ -7,7 +7,12 @@ function handleOtherConsequence(session, normalizedMessage, context) {
             "Descripción de otra consecuencia vacía"
         );
 
-        return;
+        return {
+            reply:
+                "⚠️ Necesito que describas la otra consecuencia potencial.\n\n" +
+                "Ejemplo:\n" +
+                "Contacto eléctrico, lesión ocular u otra consecuencia."
+        };
     }
     
 
@@ -25,6 +30,12 @@ function handleOtherConsequence(session, normalizedMessage, context) {
     context.log(
         "Cambio de estado: OTHER_CONSEQUENCE -> PREVENTION"
     );
+
+    return {
+        reply:
+            "✅ Otra consecuencia registrada.\n\n" +
+            "¿Qué acción o medida preventiva propones para evitar que ocurra un incidente?"
+    };
 
 }
 

@@ -67,7 +67,11 @@ async function processSession(session, normalizedMessage, context) {
     }
 
         case "OTHER_CONSEQUENCE":
-            handleOtherConsequence(session, normalizedMessage, context);
+            result = handleOtherConsequence(
+                session,
+                normalizedMessage,
+                context
+            );
     break;
 
     case "PREVENTION":
