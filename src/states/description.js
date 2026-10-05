@@ -11,6 +11,14 @@ function handleDescription(session, normalizedMessage, context) {
 context.log(
     "Cambio de estado: DESCRIPTION -> LOCATION"
 );
+
+    return {
+        reply:
+            "✅ Descripción registrada.\n\n" +
+            "¿En qué ubicación específica ocurrió o detectaste el Near Miss?\n\n" +
+            "Ejemplo:\n" +
+            "Headers, Línea 2, Almacén, Pasillo principal u otra ubicación."
+    };
 }
 
 module.exports = handleDescription;
