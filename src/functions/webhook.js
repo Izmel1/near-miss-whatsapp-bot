@@ -1,46 +1,13 @@
 const { app } = require("@azure/functions");
 const crypto = require("crypto");
 const generateFolio = require("../utils/generateFolio");
+const parseConsequences = require("../utils/parseConsequences");
 const { CONSEQUENCES, ALLOWED_IMAGE_TYPES, VERIFY_TOKEN } = require("../config/constants");
 
 
 // Sesiones temporales en memoria
 const sessions = new Map();
 
-function parseConsequences(text) {
-    if (!text) {
-        return {
-            valid: false,
-            values: []
-        };
-    }
-    // Acepta espacios, comas, punto y coma o slash como separadores.
-    const options = text
-    .split(/[\s,;/]+/)
-    .map(x => x.trim())
-    .filter(Boolean);
-
-    const uniqueOptions = [...new Set(options)];
-
-    const invalidOptions = uniqueOptions.filter(
-        option => !CONSEQUENCES[option]
-    );
-
-    if (invalidOptions.length > 0) {
-        return {
-            valid: false,
-            values: [],
-            invalidOptions
-        };
-    }
-
-    return {
-        valid: true,
-        values: uniqueOptions.map(
-            option => CONSEQUENCES[option]
-        )
-    };
-}
 
 function getOrCreateSession(userId) {
     if (!sessions.has(userId)) {
