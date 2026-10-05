@@ -1,27 +1,13 @@
 const { app } = require("@azure/functions");
-const crypto = require("crypto");
+const { getOrCreateSession } = require("../session/sessionStore");
 const generateFolio = require("../utils/generateFolio");
 const parseConsequences = require("../utils/parseConsequences");
 const { CONSEQUENCES, ALLOWED_IMAGE_TYPES, VERIFY_TOKEN } = require("../config/constants");
 
 
 // Sesiones temporales en memoria
-const sessions = new Map();
 
 
-function getOrCreateSession(userId) {
-    if (!sessions.has(userId)) {
-        sessions.set(userId, {
-            state: "START",
-            eventId: crypto.randomUUID(),
-            data: {},
-            createdAt: new Date(),
-            updatedAt: new Date()
-        });
-    }
-
-    return sessions.get(userId);
-}
 
 async function submitReport(session, context) {
     context.log("Inicio de SUBMIT: reporte listo para persistencia");
