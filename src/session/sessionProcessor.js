@@ -2,6 +2,7 @@ const handleStart = require("../states/start");
 const handleIdentity = require("../states/identity");
 const handleArea = require("../states/area");
 const handleDescription = require("../states/description");
+const handleLocation = require("../states/location");
 const parseConsequences = require("../utils/parseConsequences");
 const submitReport = require("../services/submitReport");
 const { ALLOWED_IMAGE_TYPES } = require("../config/constants");
@@ -26,18 +27,7 @@ async function processSession(session, normalizedMessage, context) {
     break;
 
         case "LOCATION":
-        session.data.location = normalizedMessage.text;
-        session.state = "CONSEQUENCE";
-        session.updatedAt = new Date();
-
-        context.log(
-        "Ubicación guardada:",
-        session.data.location
-    );
-
-    context.log(
-        "Cambio de estado: LOCATION -> CONSEQUENCE"
-    );
+            handleLocation(session, normalizedMessage, context);
     break;
 
         case "CONSEQUENCE": {
