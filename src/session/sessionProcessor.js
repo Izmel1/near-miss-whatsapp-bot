@@ -1,4 +1,5 @@
 const handleStart = require("../states/start");
+const handleIdentity = require("../states/identity");
 const parseConsequences = require("../utils/parseConsequences");
 const submitReport = require("../services/submitReport");
 const { ALLOWED_IMAGE_TYPES } = require("../config/constants");
@@ -11,17 +12,7 @@ async function processSession(session, normalizedMessage, context) {
             break;
 
         case "IDENTITY":
-            session.data.identity = normalizedMessage.text;
-            session.state = "AREA";
-
-            context.log(
-                "Identidad guardada:",
-                session.data.identity
-            );
-
-            context.log(
-                "Cambio de estado: IDENTITY -> AREA"
-            );
+            handleIdentity(session, normalizedMessage, context);
             break;
 
         case "AREA":
