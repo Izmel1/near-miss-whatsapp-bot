@@ -3,6 +3,8 @@ const handleIdentity = require("../states/identity");
 const handleArea = require("../states/area");
 const handleDescription = require("../states/description");
 const handleLocation = require("../states/location");
+const handlePrevention =
+    require("../states/prevention");
 const handleOtherConsequence =
     require("../states/otherConsequence");
 const handleConsequence =
@@ -44,34 +46,7 @@ async function processSession(session, normalizedMessage, context) {
     break;
 
     case "PREVENTION":
-    if (
-        !normalizedMessage.text ||
-        normalizedMessage.text.trim() === ""
-    ) {
-        context.log(
-            "Propuesta preventiva vacía"
-        );
-
-        break;
-    }
-
-    session.data.prevention =
-        normalizedMessage.text.trim();
-
-    session.state = "MEDIA_DECISION";
-    session.updatedAt = new Date();
-
-    
-
-    context.log(
-        "Propuesta preventiva guardada:",
-        session.data.prevention
-    );
-
-    context.log(
-        "Cambio de estado: PREVENTION -> MEDIA_DECISION"
-    );
-
+        handlePrevention(session, normalizedMessage, context);
     break;
 
     case "MEDIA_DECISION": {
