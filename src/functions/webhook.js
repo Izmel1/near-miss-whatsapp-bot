@@ -1,6 +1,8 @@
 const { app } = require("@azure/functions");
 const { getOrCreateSession } = require("../session/sessionStore");
 const submitReport = require("../services/submitReport");
+const normalizeMetaMessage =
+    require("../channels/meta/normalizeMetaMessage");
 const normalizeTwilioMessage =
     require("../channels/twilio/normalizeTwilioMessage");
 const generateFolio = require("../utils/generateFolio");
@@ -585,43 +587,7 @@ app.http("webhook", {
                     =================================================
                     */
 
-                    const type =
-                        message.type;
-
-                    normalizedMessage = {
-
-                        name:
-                            contact?.profile?.name ||
-                            "Sin nombre",
-
-                        userId:
-                            message.from,
-
-                        messageId:
-                            message.id,
-
-                        type: type,
-
-                        text:
-                            type === "text"
-                                ? message.text?.body
-                                : null,
-
-                        imageId:
-                            type === "image"
-                                ? message.image?.id
-                                : null,
-
-                        mimeType:
-                            type === "image"
-                                ? message.image?.mime_type
-                                : null,
-
-                        caption:
-                            type === "image"
-                                ? message.image?.caption || null
-                                : null
-                    };
+                    normalizedMessage = normalizeMetaMessage(message, contact);
                 }
 
                 if (!normalizedMessage.userId || !normalizedMessage.messageId) {
