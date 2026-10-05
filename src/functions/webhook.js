@@ -1,16 +1,11 @@
 const { app } = require("@azure/functions");
 const crypto = require("crypto");
+const generateFolio = require("../utils/generateFolio");
 const { CONSEQUENCES, ALLOWED_IMAGE_TYPES, VERIFY_TOKEN } = require("../config/constants");
 
 
 // Sesiones temporales en memoria
 const sessions = new Map();
-function generateFolio(itemId) {
-    const year = new Date().getFullYear();
-    const consecutive = String(itemId).padStart(5, "0");
-
-    return `SEG-${year}-${consecutive}`;
-}
 
 function parseConsequences(text) {
     if (!text) {
