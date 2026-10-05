@@ -1,5 +1,6 @@
 const { app } = require("@azure/functions");
 const { getOrCreateSession } = require("../session/sessionStore");
+const submitReport = require("../services/submitReport");
 const generateFolio = require("../utils/generateFolio");
 const parseConsequences = require("../utils/parseConsequences");
 const { CONSEQUENCES, ALLOWED_IMAGE_TYPES, VERIFY_TOKEN } = require("../config/constants");
@@ -9,20 +10,6 @@ const { CONSEQUENCES, ALLOWED_IMAGE_TYPES, VERIFY_TOKEN } = require("../config/c
 
 
 
-async function submitReport(session, context) {
-    context.log("Inicio de SUBMIT: reporte listo para persistencia");
-    context.log("Event ID:", session.eventId);
-    context.log(
-        "Datos finales:",
-        JSON.stringify(session.data, null, 2)
-    );
-
-    session.state = "COMPLETE";
-    session.updatedAt = new Date();
-
-    context.log("Fin de SUBMIT: preparación del reporte completada");
-    context.log("Cambio de estado: SUBMIT -> COMPLETE");
-}
 
 async function processSession(session, normalizedMessage, context) {
     switch (session.state) {
