@@ -3,6 +3,8 @@ const handleIdentity = require("../states/identity");
 const handleArea = require("../states/area");
 const handleDescription = require("../states/description");
 const handleLocation = require("../states/location");
+const handleMediaMore =
+    require("../states/mediaMore");
 const handleMedia =
     require("../states/media");
 const handleMediaDecision =
@@ -63,47 +65,7 @@ async function processSession(session, normalizedMessage, context) {
     break;
 }
     case "MEDIA_MORE": {
-    const option = normalizedMessage.text?.trim();
-
-    if (option === "1") {
-        session.state = "MEDIA";
-        session.updatedAt = new Date();
-
-        context.log(
-            "Usuario desea agregar otra imagen"
-        );
-
-        context.log(
-            "Cambio de estado: MEDIA_MORE -> MEDIA"
-        );
-
-        break;
-    }
-
-    if (option === "2") {
-        session.state = "SUBMIT";
-        session.updatedAt = new Date();
-
-        context.log(
-            "Usuario decidió enviar el reporte"
-        );
-
-        context.log(
-            "Cambio de estado: MEDIA_MORE -> SUBMIT"
-        );
-
-        break;
-    }
-
-    context.log(
-        "Respuesta inválida en MEDIA_MORE:",
-        normalizedMessage.text
-    );
-
-    context.log(
-        "Opciones válidas: 1 = Sí, 2 = Enviar reporte"
-    );
-
+        handleMediaMore(session, normalizedMessage, context);
     break;
 }
 
