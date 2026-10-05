@@ -3,6 +3,8 @@ const handleIdentity = require("../states/identity");
 const handleArea = require("../states/area");
 const handleDescription = require("../states/description");
 const handleLocation = require("../states/location");
+const handleMediaDecision =
+    require("../states/mediaDecision");
 const handlePrevention =
     require("../states/prevention");
 const handleOtherConsequence =
@@ -50,51 +52,7 @@ async function processSession(session, normalizedMessage, context) {
     break;
 
     case "MEDIA_DECISION": {
-    const option = normalizedMessage.text?.trim();
-
-    if (option === "1") {
-        session.data.hasEvidence = false;
-        session.data.images = [];
-        session.state = "MEDIA";
-        session.updatedAt = new Date();
-
-        context.log(
-            "Usuario indicó que sí tiene fotografías"
-        );
-
-        context.log(
-            "Cambio de estado: MEDIA_DECISION -> MEDIA"
-        );
-
-        break;
-    }
-
-    if (option === "2") {
-        session.data.hasEvidence = false;
-        session.data.images = [];
-        session.state = "SUBMIT";
-        session.updatedAt = new Date();
-
-        context.log(
-            "Usuario indicó que no tiene fotografías"
-        );
-
-        context.log(
-            "Cambio de estado: MEDIA_DECISION -> SUBMIT"
-        );
-
-        break;
-    }
-
-    context.log(
-        "Respuesta inválida en MEDIA_DECISION:",
-        normalizedMessage.text
-    );
-
-    context.log(
-        "Opciones válidas: 1 = Sí, 2 = No"
-    );
-
+        handleMediaDecision(session, normalizedMessage, context);
     break;
 }
 
