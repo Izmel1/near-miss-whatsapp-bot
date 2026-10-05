@@ -26,7 +26,11 @@ async function processSession(session, normalizedMessage, context) {
             break;
 
         case "IDENTITY":
-            handleIdentity(session, normalizedMessage, context);
+            result = handleIdentity(
+                session,
+                normalizedMessage,
+                context
+            );
             break;
 
         case "AREA":
