@@ -50,11 +50,19 @@ async function processSession(session, normalizedMessage, context) {
     break;
 
         case "LOCATION":
-            handleLocation(session, normalizedMessage, context);
+            result = handleLocation(
+                session,
+                normalizedMessage,
+                context
+            );
     break;
 
         case "CONSEQUENCE": {
-            handleConsequence(session, normalizedMessage, context);
+            result = handleConsequence(
+                session,
+                normalizedMessage,
+                context
+            );
     break;
     }
 
