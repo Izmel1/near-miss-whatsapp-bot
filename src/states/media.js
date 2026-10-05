@@ -27,7 +27,11 @@ function handleMedia(session, normalizedMessage, context) {
                 normalizedMessage.mimeType
             );
 
-            return;
+            return {
+                reply:
+                    "⚠️ El formato de la imagen no es válido.\n\n" +
+                    "Envía una fotografía en formato JPG, JPEG o PNG."
+            };
         }
 
         // Máximo 5 fotografías
@@ -44,7 +48,12 @@ function handleMedia(session, normalizedMessage, context) {
                 "Cambio de estado: MEDIA -> SUBMIT"
             );
 
-            return;
+            return {
+                reply:
+                    "✅ Se alcanzó el máximo de 5 fotografías.\n\n" +
+                    "La captura del Near Miss está completa y el reporte está listo para su registro.\n\n" +
+                    "La confirmación con folio se habilitará al integrar SharePoint."
+            };
         }
 
         
@@ -99,7 +108,19 @@ function handleMedia(session, normalizedMessage, context) {
 }
 
         // Con menos de 5 imágenes pasa a MEDIA_MORE; con 5, a SUBMIT.
-        return;
+        return {
+            reply: session.data.images.length === 5
+                ? ("✅ Fotografía recibida (5 de 5).\n\n" +
+                "Alcanzaste el máximo de fotografías.\n\n" +
+                "La captura del Near Miss está completa y el reporte está listo para su registro.\n\n" +
+                "La confirmación con folio se habilitará al integrar SharePoint.")
+                : ("✅ Fotografía recibida (" +
+                session.data.images.length +
+                " de 5).\n\n" +
+                "¿Deseas agregar más imágenes?\n\n" +
+                "1. Sí\n" +
+                "2. Enviar reporte")
+        };
     }
 
     /*
@@ -140,7 +161,12 @@ function handleMedia(session, normalizedMessage, context) {
                 "Cambio de estado: MEDIA -> SUBMIT"
             );
 
-            return;
+            return {
+                reply:
+                    "✅ Captura del Near Miss completada.\n\n" +
+                    "El reporte está listo para su registro.\n\n" +
+                    "La confirmación con folio se habilitará al integrar SharePoint."
+            };
         }
 
 
@@ -153,13 +179,25 @@ function handleMedia(session, normalizedMessage, context) {
             "Debe enviar una imagen o escribir Continuar"
         );
 
-        return;
+        return {
+            reply:
+                "⚠️ En este momento debes enviar una fotografía.\n\n" +
+                "También puedes escribir:\n" +
+                "Continuar sin foto"
+        };
     }
 
     context.log(
         "Tipo de mensaje no soportado en MEDIA:",
         normalizedMessage.type
     );
+
+    return {
+        reply:
+            "⚠️ Ese tipo de mensaje no está soportado.\n\n" +
+            "Envía una fotografía JPG, JPEG o PNG, o escribe:\n" +
+            "Continuar sin foto"
+    };
 
 }
 

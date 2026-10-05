@@ -92,7 +92,11 @@ async function processSession(session, normalizedMessage, context) {
 }
 
     case "MEDIA": {
-        handleMedia(session, normalizedMessage, context);
+        result = handleMedia(
+            session,
+            normalizedMessage,
+            context
+        );
     break;
 }
     case "MEDIA_MORE": {
