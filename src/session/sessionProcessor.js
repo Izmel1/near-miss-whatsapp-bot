@@ -3,6 +3,8 @@ const handleIdentity = require("../states/identity");
 const handleArea = require("../states/area");
 const handleDescription = require("../states/description");
 const handleLocation = require("../states/location");
+const handleOtherConsequence =
+    require("../states/otherConsequence");
 const handleConsequence =
     require("../states/consequence");
 const parseConsequences = require("../utils/parseConsequences");
@@ -38,33 +40,7 @@ async function processSession(session, normalizedMessage, context) {
     }
 
         case "OTHER_CONSEQUENCE":
-    if (
-        !normalizedMessage.text ||
-        normalizedMessage.text.trim() === ""
-    ) {
-        context.log(
-            "Descripción de otra consecuencia vacía"
-        );
-
-        break;
-    }
-    
-
-    session.data.otherConsequence =
-        normalizedMessage.text.trim();
-
-    session.state = "PREVENTION";
-    session.updatedAt = new Date();
-
-    context.log(
-        "Otra consecuencia guardada:",
-        session.data.otherConsequence
-    );
-
-    context.log(
-        "Cambio de estado: OTHER_CONSEQUENCE -> PREVENTION"
-    );
-
+            handleOtherConsequence(session, normalizedMessage, context);
     break;
 
     case "PREVENTION":
