@@ -7,6 +7,8 @@ const normalizeMetaMessage =
     require("../channels/meta/normalizeMetaMessage");
 const normalizeTwilioMessage =
     require("../channels/twilio/normalizeTwilioMessage");
+const twimlResponse =
+    require("../channels/twilio/twimlResponse");
 const generateFolio = require("../utils/generateFolio");
 const parseConsequences = require("../utils/parseConsequences");
 const { CONSEQUENCES, ALLOWED_IMAGE_TYPES, VERIFY_TOKEN } = require("../config/constants");
@@ -173,7 +175,7 @@ app.http("webhook", {
                     session.state
                 );
 
-                await processSession(
+                const result = await processSession(
                     session,
                     normalizedMessage,
                     context
@@ -192,6 +194,13 @@ app.http("webhook", {
                         2
                     )
                 );
+
+                if (
+                    contentType === "application/x-www-form-urlencoded" &&
+                    result?.reply
+                ) {
+                    return twimlResponse(result.reply);
+                }
 
                 return {
                     status: 200,
