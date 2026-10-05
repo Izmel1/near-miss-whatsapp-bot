@@ -1,6 +1,8 @@
 const { app } = require("@azure/functions");
 const { getOrCreateSession } = require("../session/sessionStore");
 const submitReport = require("../services/submitReport");
+const normalizeTwilioMessage =
+    require("../channels/twilio/normalizeTwilioMessage");
 const generateFolio = require("../utils/generateFolio");
 const parseConsequences = require("../utils/parseConsequences");
 const { CONSEQUENCES, ALLOWED_IMAGE_TYPES, VERIFY_TOKEN } = require("../config/constants");
@@ -540,24 +542,7 @@ app.http("webhook", {
 
                 // Twilio: los mensajes llegan como formulario URL-encoded.
                 if (contentType === "application/x-www-form-urlencoded") {
-                    const form = new URLSearchParams(await request.text());
-                    const messageId = form.get("MessageSid");
-                    const bodyText = form.get("Body") || "";
-                    const mimeType = form.get("MediaContentType0");
-                    const isImage = Number(form.get("NumMedia") || 0) > 0 &&
-                        (mimeType || "").startsWith("image/");
-
-                    normalizedMessage = {
-                        name: form.get("ProfileName") || "Sin nombre",
-                        userId: form.get("From")?.replace(/^whatsapp:/, ""),
-                        messageId,
-                        type: isImage ? "image" : "text",
-                        text: bodyText,
-                        imageId: isImage ? `${messageId}:0` : null,
-                        mediaUrl: isImage ? form.get("MediaUrl0") : null,
-                        mimeType: isImage ? mimeType : null,
-                        caption: isImage ? bodyText : null
-                    };
+                    normalizedMessage = await normalizeTwilioMessage(request);
                 } else {
                     // Meta y simulaciones: se conserva la lectura del JSON actual.
                     const body = await request.json();
