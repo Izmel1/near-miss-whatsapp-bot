@@ -1,3 +1,4 @@
+const handleStart = require("../states/start");
 const parseConsequences = require("../utils/parseConsequences");
 const submitReport = require("../services/submitReport");
 const { ALLOWED_IMAGE_TYPES } = require("../config/constants");
@@ -6,9 +7,7 @@ async function processSession(session, normalizedMessage, context) {
     switch (session.state) {
 
         case "START":
-            session.state = "IDENTITY";
-
-            context.log("Cambio de estado: START -> IDENTITY");
+            handleStart(session, context);
             break;
 
         case "IDENTITY":
