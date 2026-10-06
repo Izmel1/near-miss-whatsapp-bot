@@ -1,7 +1,9 @@
 function handlePrevention(session, normalizedMessage, context) {
+    const rawPrevention = normalizedMessage.text;
+
     if (
-        !normalizedMessage.text ||
-        normalizedMessage.text.trim() === ""
+        typeof rawPrevention !== "string" ||
+        rawPrevention.trim() === ""
     ) {
         context.log(
             "Propuesta preventiva vacía"
@@ -15,8 +17,9 @@ function handlePrevention(session, normalizedMessage, context) {
         };
     }
 
-    session.data.prevention =
-        normalizedMessage.text.trim();
+    const prevention = rawPrevention.trim();
+
+    session.data.prevention = prevention;
 
     session.state = "MEDIA_DECISION";
     session.updatedAt = new Date();

@@ -13,10 +13,21 @@ const CONSEQUENCES = {
     "8": "Otro"
 };
 
+const AREAS = {
+    "1": "Estructuras",
+    "2": "Plasticos",
+    "3": "Headers",
+    "4": "Almacen",
+    "5": "Embarques",
+    "6": "Calidad",
+    "7": "Vigilancia",
+    "8": "Oficinas Generales"
+}
+
 const ALLOWED_IMAGE_TYPES = [
     "image/jpeg",
     "image/jpg",
     "image/png"
 ];
 
-module.exports = { CONSEQUENCES, ALLOWED_IMAGE_TYPES, VERIFY_TOKEN };
+module.exports = { CONSEQUENCES, AREAS, ALLOWED_IMAGE_TYPES, VERIFY_TOKEN };

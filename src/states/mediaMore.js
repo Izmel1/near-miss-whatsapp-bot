@@ -1,5 +1,18 @@
+const handleMedia = require("./media");
+
 function handleMediaMore(session, normalizedMessage, context) {
-    const option = normalizedMessage.text?.trim();
+    if (normalizedMessage.type === "image") {
+        context.log("Imagen recibida directamente en MEDIA_MORE");
+
+        return handleMedia(session, normalizedMessage, context);
+    }
+
+    const rawOption = normalizedMessage.text;
+    const option =
+        normalizedMessage.type === "text" &&
+        typeof rawOption === "string"
+            ? rawOption.trim()
+            : null;
 
     if (option === "1") {
         session.state = "MEDIA";
