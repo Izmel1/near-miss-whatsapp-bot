@@ -1,5 +1,23 @@
 function handleDescription(session, normalizedMessage, context) {
-        session.data.description = normalizedMessage.text;
+        const rawDescription = normalizedMessage.text;
+
+        if (
+            typeof rawDescription !== "string" ||
+            rawDescription.trim() === ""
+        ) {
+            context.log("Descripción inválida");
+
+            return {
+                reply:
+                    "⚠️ Necesito que describas la condición o situación insegura.\n\n" +
+                    "Ejemplo:\n" +
+                    "Hay aceite derramado en el piso cerca de una máquina."
+            };
+        }
+
+        const description = rawDescription.trim();
+
+        session.data.description = description;
         session.state = "LOCATION";
         session.updatedAt = new Date();
 
