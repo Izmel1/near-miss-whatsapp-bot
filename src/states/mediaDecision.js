@@ -1,6 +1,10 @@
 function handleMediaDecision(session, normalizedMessage, context) {
     const rawOption = normalizedMessage.text;
-    const option = typeof rawOption === "string" ? rawOption.trim() : null;
+    const option =
+        normalizedMessage.type === "text" &&
+        typeof rawOption === "string"
+            ? rawOption.trim()
+            : null;
 
     if (option === "1") {
         session.data.hasEvidence = false;

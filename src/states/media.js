@@ -15,18 +15,43 @@ function handleMedia(session, normalizedMessage, context) {
     */
 
     if (normalizedMessage.type === "image") {
+        const mediaItems = Array.isArray(normalizedMessage.mediaItems) &&
+            normalizedMessage.mediaItems.length > 0
+                ? normalizedMessage.mediaItems
+                : [normalizedMessage];
+        const previousState = session.state;
+        let accepted = 0;
+        let allowedFound = false;
 
-        // Validar tipo de imagen
-        if (
-            !ALLOWED_IMAGE_TYPES.includes(
-                normalizedMessage.mimeType
-            )
-        ) {
-            context.log(
-                "Formato de imagen no permitido:",
-                normalizedMessage.mimeType
-            );
+        for (const item of mediaItems) {
+            if (!ALLOWED_IMAGE_TYPES.includes(item?.mimeType)) {
+                context.log("Formato de imagen no permitido:", item?.mimeType);
+                continue;
+            }
 
+            allowedFound = true;
+            if (session.data.images.length >= 5) {
+                context.log("Límite máximo de 5 imágenes alcanzado");
+                break;
+            }
+
+            // Por ahora se almacenan únicamente los metadatos.
+            session.data.images.push({
+                imageId: item.imageId,
+                mediaUrl: item.mediaUrl,
+                mimeType: item.mimeType,
+                caption: item.caption,
+                messageId: item.messageId,
+                receivedAt: new Date().toISOString()
+            });
+            accepted++;
+            session.data.hasEvidence = true;
+            session.updatedAt = new Date();
+            context.log("Imagen registrada:", item.imageId);
+            context.log("Total de imágenes:", session.data.images.length);
+        }
+
+        if (!allowedFound) {
             return {
                 reply:
                     "⚠️ El formato de la imagen no es válido.\n\n" +
@@ -34,92 +59,32 @@ function handleMedia(session, normalizedMessage, context) {
             };
         }
 
-        // Máximo 5 fotografías
+        const received = accepted > 1 ? "Fotografías recibidas" : "Fotografía recibida";
         if (session.data.images.length >= 5) {
-
-            context.log(
-                "Límite máximo de 5 imágenes alcanzado"
-            );
-
             session.state = "SUBMIT";
             session.updatedAt = new Date();
-
-            context.log(
-                "Cambio de estado: MEDIA -> SUBMIT"
-            );
+            context.log("Máximo de 5 imágenes recibido");
+            context.log(`Cambio de estado: ${previousState} -> SUBMIT`);
 
             return {
-                reply:
-                    "✅ Se alcanzó el máximo de 5 fotografías.\n\n" +
+                reply: (accepted === 0
+                    ? "✅ Se alcanzó el máximo de 5 fotografías.\n\n"
+                    : `✅ ${received} (5 de 5).\n\nAlcanzaste el máximo de fotografías.\n\n`) +
                     "La captura del Near Miss está completa y el reporte está listo para su registro.\n\n" +
                     "La confirmación con folio se habilitará al integrar SharePoint."
             };
         }
 
-        
-
-        // Guardamos por ahora los metadatos
-        session.data.images.push({
-            imageId: normalizedMessage.imageId,
-            mediaUrl: normalizedMessage.mediaUrl,
-            mimeType: normalizedMessage.mimeType,
-            caption: normalizedMessage.caption,
-            messageId: normalizedMessage.messageId,
-            receivedAt: new Date().toISOString()
-        });
-
-        session.data.hasEvidence = true;
-        session.updatedAt = new Date();
-
-        context.log(
-            "Imagen registrada:",
-            normalizedMessage.imageId
-        );
-
-        context.log(
-            "Total de imágenes:",
-            session.data.images.length
-        );
-
-        // Si ya llegó a 5, avanzar automáticamente
-        if (session.data.images.length === 5) {
-        session.state = "SUBMIT";
-
-        context.log(
-        "Máximo de 5 imágenes recibido"
-    );
-
-        context.log(
-        "Cambio de estado: MEDIA -> SUBMIT"
-    );
-
-    } else {
         session.state = "MEDIA_MORE";
+        context.log(`Cambio de estado: ${previousState} -> MEDIA_MORE`);
+        context.log("¿Deseas agregar más imágenes? 1 = Sí, 2 = Enviar reporte");
 
-        context.log(
-        "Cambio de estado: MEDIA -> MEDIA_MORE"
-    );
-
-        context.log(
-        "¿Deseas agregar más imágenes? 1 = Sí, 2 = Enviar reporte"
-    );
-
-    
-}
-
-        // Con menos de 5 imágenes pasa a MEDIA_MORE; con 5, a SUBMIT.
         return {
-            reply: session.data.images.length === 5
-                ? ("✅ Fotografía recibida (5 de 5).\n\n" +
-                "Alcanzaste el máximo de fotografías.\n\n" +
-                "La captura del Near Miss está completa y el reporte está listo para su registro.\n\n" +
-                "La confirmación con folio se habilitará al integrar SharePoint.")
-                : ("✅ Fotografía recibida (" +
-                session.data.images.length +
-                " de 5).\n\n" +
+            reply:
+                `✅ ${received} (${session.data.images.length} de 5).\n\n` +
                 "¿Deseas agregar más imágenes?\n\n" +
                 "1. Sí\n" +
-                "2. Enviar reporte")
+                "2. Enviar reporte"
         };
     }
 
@@ -131,10 +96,11 @@ function handleMedia(session, normalizedMessage, context) {
 
     if (normalizedMessage.type === "text") {
 
+        const rawText = normalizedMessage.text;
         const text =
-            normalizedMessage.text
-                ?.trim()
-                .toLowerCase();
+            typeof rawText === "string"
+                ? rawText.trim().toLowerCase()
+                : null;
 
         if (
             text === "continuar" ||
