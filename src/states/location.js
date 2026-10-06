@@ -1,5 +1,25 @@
+const {CONSEQUENCES} = require ("../config/constants")
+
 function handleLocation(session, normalizedMessage, context) {
-    session.data.location = normalizedMessage.text;
+    const rawLocation = normalizedMessage.text;
+
+    if (
+        typeof rawLocation !== "string" ||
+        rawLocation.trim() === ""
+    ) {
+        context.log("Ubicación inválida");
+
+        return {
+            reply:
+                "⚠️ Necesito que indiques la ubicación específica del Near Miss.\n\n" +
+                "Ejemplo:\n" +
+                "Headers, Línea 2, Almacén o Pasillo principal."
+        };
+    }
+
+    const location = rawLocation.trim();
+
+    session.data.location = location;
     session.state = "CONSEQUENCE";
     session.updatedAt = new Date();
 
@@ -7,6 +27,10 @@ function handleLocation(session, normalizedMessage, context) {
     "Ubicación guardada:",
     session.data.location
 );
+
+const Menuconsecuencia = Object.entries(CONSEQUENCES)
+        .map(([code, name]) => `${code}. ${name}`)
+        .join("\n");
 
 context.log(
     "Cambio de estado: LOCATION -> CONSEQUENCE"
@@ -16,14 +40,7 @@ context.log(
         reply:
             "✅ Ubicación registrada.\n\n" +
             "Selecciona una o varias consecuencias potenciales:\n\n" +
-            "1. Golpe\n" +
-            "2. Caída\n" +
-            "3. Atrapamiento\n" +
-            "4. Cortadura\n" +
-            "5. Quemadura\n" +
-            "6. Derrame\n" +
-            "7. Daño a equipo\n" +
-            "8. Otro\n\n" +
+            Menuconsecuencia + "\n\n" +
             "Puedes seleccionar varias opciones separadas por coma.\n" +
             "Ejemplo: 1,2,6"
     };

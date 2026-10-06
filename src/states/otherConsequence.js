@@ -1,7 +1,9 @@
 function handleOtherConsequence(session, normalizedMessage, context) {
+    const rawOtherConsequence = normalizedMessage.text;
+
     if (
-        !normalizedMessage.text ||
-        normalizedMessage.text.trim() === ""
+        typeof rawOtherConsequence !== "string" ||
+        rawOtherConsequence.trim() === ""
     ) {
         context.log(
             "Descripción de otra consecuencia vacía"
@@ -16,8 +18,9 @@ function handleOtherConsequence(session, normalizedMessage, context) {
     }
     
 
-    session.data.otherConsequence =
-        normalizedMessage.text.trim();
+    const otherConsequence = rawOtherConsequence.trim();
+
+    session.data.otherConsequence = otherConsequence;
 
     session.state = "PREVENTION";
     session.updatedAt = new Date();
