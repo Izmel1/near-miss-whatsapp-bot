@@ -1,3 +1,5 @@
+const generateFolio = require("../utils/generateFolio");
+
 function requireEnvironment(name) {
     const value = process.env[name];
     if (typeof value !== "string" || value.trim() === "") {
@@ -242,6 +244,11 @@ async function createNearMissItem(report) {
         throw new Error("Invalid report field: otherConsequence must be a string");
     }
 
+    const reportDate = new Date(report.fechaHoraReporte);
+    if (Number.isNaN(reportDate.getTime()) || reportDate.getUTCFullYear() < 1000 ||
+        reportDate.getUTCFullYear() > 9999) {
+        throw new Error("Invalid report field: fechaHoraReporte must be a valid date");
+    }
     const siteId = requireEnvironment("SHAREPOINT_SITE_ID");
     const listId = requireEnvironment("SHAREPOINT_NEARMISS_LIST_ID");
     const areaId = await resolveAreaId(report.area);
@@ -299,7 +306,46 @@ async function createNearMissItem(report) {
     if (typeof item?.id !== "string" || !item.id.trim()) {
         throw new Error("Failed to create SharePoint Near Miss: item ID missing or invalid");
     }
-    return { id: item.id, webUrl: item.webUrl || null, fields: item.fields || null };
+    const folio = generateFolio(item.id, reportDate.getUTCFullYear());
+    try {
+        await updateNearMissFolio(item.id, folio);
+    } catch (error) {
+        throw new Error(`SharePoint Near Miss item ${item.id} created, but Folio update failed: ${error.message}`);
+    }
+    return {
+        id: item.id,
+        folio,
+        webUrl: item.webUrl || null,
+        fields: item.fields ? { ...item.fields, Folio: folio } : null
+    };
+}
+
+async function updateNearMissFolio(itemId, folio) {
+    // Reutiliza la validación del ID del generador existente.
+    generateFolio(itemId, 2000);
+    if (typeof folio !== "string" || !/^SEG-\d{4}-\d{5,}$/.test(folio)) {
+        throw new Error("Invalid folio: expected SEG-AAAA-#####");
+    }
+    const siteId = requireEnvironment("SHAREPOINT_SITE_ID");
+    const listId = requireEnvironment("SHAREPOINT_NEARMISS_LIST_ID");
+    const token = await getGraphAccessToken();
+    let response;
+    try {
+        response = await fetch(
+            `https://graph.microsoft.com/v1.0/sites/${encodeURIComponent(siteId)}/lists/${encodeURIComponent(listId)}/items/${Number(itemId)}/fields`,
+            {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ Folio: folio })
+            }
+        );
+    } catch {
+        throw new Error("Failed to update SharePoint Near Miss Folio: network error");
+    }
+    if (response.status !== 200) {
+        throw new Error(`Failed to update SharePoint Near Miss Folio: HTTP ${response.status}`);
+    }
+    return { id: String(Number(itemId)), folio };
 }
 
 module.exports = {
@@ -308,5 +354,6 @@ module.exports = {
     getConsequences,
     resolveAreaId,
     resolveConsequenceIds,
-    createNearMissItem
+    createNearMissItem,
+    updateNearMissFolio
 };
