@@ -217,10 +217,96 @@ async function resolveConsequenceIds(consequenceNames) {
     return ids;
 }
 
+async function createNearMissItem(report) {
+    if (!report || typeof report !== "object" || Array.isArray(report)) {
+        throw new Error("Invalid report: expected an object");
+    }
+    const requiredFields = [
+        "eventId", "fechaHoraReporte", "numeroEmpleado", "whatsappUserId",
+        "area", "ubicacion", "descripcion", "prevention"
+    ];
+    for (const field of requiredFields) {
+        if (typeof report[field] !== "string" || report[field].trim() === "") {
+            throw new Error(`Invalid report field: ${field} must be a non-empty string`);
+        }
+    }
+    if (!Array.isArray(report.consequences) || report.consequences.length === 0) {
+        throw new Error("Invalid report field: consequences must be a non-empty array");
+    }
+    for (const name of report.consequences) {
+        if (typeof name !== "string" || name.trim() === "") {
+            throw new Error("Invalid report field: consequences must contain non-empty strings");
+        }
+    }
+    if (report.otherConsequence != null && typeof report.otherConsequence !== "string") {
+        throw new Error("Invalid report field: otherConsequence must be a string");
+    }
+
+    const siteId = requireEnvironment("SHAREPOINT_SITE_ID");
+    const listId = requireEnvironment("SHAREPOINT_NEARMISS_LIST_ID");
+    const areaId = await resolveAreaId(report.area);
+    const consequenceIds = await resolveConsequenceIds(report.consequences);
+    const areaLookupId = Number(areaId);
+    const consequenceLookupIds = consequenceIds.map(Number);
+    if (!Number.isSafeInteger(areaLookupId) || areaLookupId <= 0 ||
+        consequenceLookupIds.some(id => !Number.isSafeInteger(id) || id <= 0)) {
+        throw new Error("Invalid SharePoint Lookup ID: expected positive integers");
+    }
+
+    const payload = {
+        fields: {
+            Title: report.eventId,
+            FechaHoraReporte: report.fechaHoraReporte,
+            NumeroEmpleado: report.numeroEmpleado,
+            WhatsAppUserId: report.whatsappUserId,
+            AreaLookupId: areaLookupId,
+            Ubicacion: report.ubicacion,
+            Descripcion: report.descripcion,
+            "ConsecuenciaPotencialLookupId@odata.type": "Collection(Edm.Int32)",
+            ConsecuenciaPotencialLookupId: consequenceLookupIds,
+            OtraConsecuencia: report.otherConsequence || "",
+            PropuestaPrevencion: report.prevention,
+            TieneEvidencia: report.hasEvidence === true,
+            Estado: "Nuevo"
+        }
+    };
+    const token = await getGraphAccessToken();
+    let response;
+    try {
+        response = await fetch(
+            `https://graph.microsoft.com/v1.0/sites/${encodeURIComponent(siteId)}/lists/${encodeURIComponent(listId)}/items`,
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`
+                },
+                body: JSON.stringify(payload)
+            }
+        );
+    } catch {
+        throw new Error("Failed to create SharePoint Near Miss: network error");
+    }
+    if (response.status !== 201) {
+        throw new Error(`Failed to create SharePoint Near Miss: HTTP ${response.status}`);
+    }
+    let item;
+    try {
+        item = await response.json();
+    } catch {
+        throw new Error("Failed to create SharePoint Near Miss: invalid JSON response");
+    }
+    if (typeof item?.id !== "string" || !item.id.trim()) {
+        throw new Error("Failed to create SharePoint Near Miss: item ID missing or invalid");
+    }
+    return { id: item.id, webUrl: item.webUrl || null, fields: item.fields || null };
+}
+
 module.exports = {
     getGraphAccessToken,
     getAreas,
     getConsequences,
     resolveAreaId,
-    resolveConsequenceIds
+    resolveConsequenceIds,
+    createNearMissItem
 };
