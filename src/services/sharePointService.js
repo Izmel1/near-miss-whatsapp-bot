@@ -168,4 +168,59 @@ async function getConsequences() {
     return consequences;
 }
 
-module.exports = { getGraphAccessToken, getAreas, getConsequences };
+async function resolveAreaId(areaName) {
+    if (typeof areaName !== "string" || areaName.trim() === "") {
+        throw new Error("Invalid areaName: expected a non-empty string");
+    }
+
+    const name = areaName.trim();
+    const areas = await getAreas();
+    const area = areas.find(item =>
+        item.active === true &&
+        typeof item.name === "string" &&
+        item.name.trim().toLowerCase() === name.toLowerCase()
+    );
+    if (!area) {
+        throw new Error(`SharePoint area not found or inactive: ${name}`);
+    }
+    return area.id;
+}
+
+async function resolveConsequenceIds(consequenceNames) {
+    if (!Array.isArray(consequenceNames) || consequenceNames.length === 0) {
+        throw new Error("Invalid consequenceNames: expected a non-empty array");
+    }
+
+    const names = [];
+    for (const name of consequenceNames) {
+        if (typeof name !== "string" || name.trim() === "") {
+            throw new Error("Invalid consequenceNames: every element must be a non-empty string");
+        }
+        names.push(name.trim());
+    }
+
+    const consequences = await getConsequences();
+    const ids = [];
+    for (const name of names) {
+        const consequence = consequences.find(item =>
+            item.active === true &&
+            typeof item.name === "string" &&
+            item.name.trim().toLowerCase() === name.toLowerCase()
+        );
+        if (!consequence) {
+            throw new Error(`SharePoint consequence not found or inactive: ${name}`);
+        }
+        if (!ids.includes(consequence.id)) {
+            ids.push(consequence.id);
+        }
+    }
+    return ids;
+}
+
+module.exports = {
+    getGraphAccessToken,
+    getAreas,
+    getConsequences,
+    resolveAreaId,
+    resolveConsequenceIds
+};
