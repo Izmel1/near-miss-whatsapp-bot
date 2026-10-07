@@ -295,7 +295,26 @@ async function createNearMissItem(report) {
         throw new Error("Failed to create SharePoint Near Miss: network error");
     }
     if (response.status !== 201) {
-        throw new Error(`Failed to create SharePoint Near Miss: HTTP ${response.status}`);
+        let detail = "";
+        try {
+            const body = await response.json();
+            const code = body?.error?.code;
+            const message = body?.error?.message;
+            if (typeof code === "string" && code.trim() &&
+                typeof message === "string" && message.trim()) {
+                const diagnostic = `${code.trim()}: ${message.trim()}`;
+                const secrets = [token, process.env.CLIENT_SECRET].filter(
+                    value => typeof value === "string" && value.length > 0
+                );
+                const containsSecret = secrets.some(value => diagnostic.includes(value));
+                if (!containsSecret && !/access_token|authorization|client_secret|bearer\s/i.test(diagnostic)) {
+                    detail = ` - ${diagnostic}`;
+                }
+            }
+        } catch {
+            // Un body ilegible mantiene el diagnóstico HTTP original.
+        }
+        throw new Error(`Failed to create SharePoint Near Miss: HTTP ${response.status}${detail}`);
     }
     let item;
     try {

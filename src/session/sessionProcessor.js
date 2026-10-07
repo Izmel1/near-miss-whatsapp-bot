@@ -127,7 +127,7 @@ default:
 
     // SUBMIT es inmediato: no requiere otro mensaje del usuario.
     if (session.state === "SUBMIT") {
-        await submitReport(session, context);
+        await submitReport(session, normalizedMessage.userId, context);
     }
 
     session.updatedAt = new Date();
