@@ -24,7 +24,8 @@ function handleMediaDecision(session, normalizedMessage, context) {
             reply:
                 "📷 Envía la primera fotografía como evidencia.\n\n" +
                 "Puedes agregar hasta 5 imágenes.\n\n" +
-                "Si cambias de opinión, también puedes escribir:\n" +
+                "Si deseas enviar multiples imagenes, envialas una a una.\n\n" +
+                "\n\nSi cambias de opinión, también puedes escribir:\n" +
                 "Continuar sin foto"
         };
     }
