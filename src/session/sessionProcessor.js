@@ -127,7 +127,14 @@ default:
 
     // SUBMIT es inmediato: no requiere otro mensaje del usuario.
     if (session.state === "SUBMIT") {
-        await submitReport(session, normalizedMessage.userId, context);
+        const created = await submitReport(session, normalizedMessage.userId, context);
+        result = {
+            reply:
+                "✅ Reporte Near Miss registrado correctamente.\n\n" +
+                "Folio:\n" +
+                created.folio + "\n\n" +
+                "Gracias por reportar la condición."
+        };
     }
 
     session.updatedAt = new Date();
