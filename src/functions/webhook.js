@@ -1,6 +1,7 @@
 const { app } = require("@azure/functions");
 const { getOrCreateSession, saveSession } = require("../session/sessionStore");
 const { claimMessage, completeMessage, releaseMessage } = require("../services/messageIdempotencyService");
+const { acquireSessionLock, releaseSessionLock } = require("../services/sessionLockService");
 const processSession =
     require("../session/sessionProcessor");
 const submitReport = require("../services/submitReport");
@@ -81,6 +82,8 @@ app.http("webhook", {
 
         if (request.method === "POST") {
             let claimedMessageId;
+            let lockedUserId;
+            let lockToken;
 
             try {
 
@@ -160,6 +163,14 @@ app.http("webhook", {
                         };
                     }
                     claimedMessageId = normalizedMessage.messageId;
+                    const lock = await acquireSessionLock(normalizedMessage.userId);
+                    if (lock.status === "BUSY") {
+                        await releaseMessage(claimedMessageId);
+                        claimedMessageId = undefined;
+                        return { status: 503, body: "SESSION_BUSY" };
+                    }
+                    lockedUserId = normalizedMessage.userId;
+                    lockToken = lock.token;
                 }
 
                 /*
@@ -234,6 +245,14 @@ app.http("webhook", {
                     status: 500,
                     body: "ERROR"
                 };
+            } finally {
+                if (lockToken) {
+                    try {
+                        await releaseSessionLock(lockedUserId, lockToken);
+                    } catch {
+                        context.error("Failed to release session lock");
+                    }
+                }
             }
         }
 
