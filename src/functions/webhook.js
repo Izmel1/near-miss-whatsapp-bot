@@ -1,4 +1,5 @@
 const { app } = require("@azure/functions");
+const { validateTwilioWebhook } = require("../services/twilioWebhookValidationService");
 const { getSession, getOrCreateSession, saveSession } = require("../session/sessionStore");
 const { findMessageReceipt, recordMessageReceipt } = require("../services/sessionMessageReceiptService");
 const { claimMessage, completeMessage, releaseMessage } = require("../services/messageIdempotencyService");
@@ -100,7 +101,23 @@ app.http("webhook", {
 
                 // Twilio: los mensajes llegan como formulario URL-encoded.
                 if (contentType === "application/x-www-form-urlencoded") {
-                    normalizedMessage = await normalizeTwilioMessage(request);
+                    const rawBody = await request.text();
+                    const params = Object.create(null);
+                    for (const [name, value] of new URLSearchParams(rawBody)) {
+                        if (!Object.prototype.hasOwnProperty.call(params, name)) {
+                            params[name] = value;
+                        } else if (Array.isArray(params[name])) {
+                            params[name].push(value);
+                        } else {
+                            params[name] = [params[name], value];
+                        }
+                    }
+                    const signature = request.headers.get("X-Twilio-Signature");
+                    if (!validateTwilioWebhook({ signature, params })) {
+                        context.log("Invalid Twilio webhook signature");
+                        return { status: 403, body: "FORBIDDEN" };
+                    }
+                    normalizedMessage = await normalizeTwilioMessage({ text: async () => rawBody });
                 } else {
                     // Meta y simulaciones: se conserva la lectura del JSON actual.
                     const body = await request.json();
@@ -264,7 +281,9 @@ app.http("webhook", {
                         context.error("Failed to release message idempotency claim");
                     }
                 }
-                context.error("Error procesando webhook");
+                context.error(error?.code === "TWILIO_VALIDATION_CONFIGURATION"
+                    ? "Twilio webhook validation is not configured"
+                    : "Error procesando webhook");
 
                 return {
                     status: 500,
