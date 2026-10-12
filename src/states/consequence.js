@@ -21,6 +21,8 @@ function handleConsequence(session, normalizedMessage, context) {
             reply:
                 "⚠️ La opción ingresada no es válida.\n\n" +
                 "Selecciona una o varias consecuencias potenciales:\n\n" +
+                "Puedes seleccionar varias opciones separadas por coma.\n" +
+                "Ejemplo: 1,2,6\n\n" +
                 "1. Golpe\n" +
                 "2. Caída\n" +
                 "3. Atrapamiento\n" +
@@ -28,9 +30,7 @@ function handleConsequence(session, normalizedMessage, context) {
                 "5. Quemadura\n" +
                 "6. Derrame\n" +
                 "7. Daño a equipo\n" +
-                "8. Otro\n\n" +
-                "Puedes seleccionar varias opciones separadas por coma.\n" +
-                "Ejemplo: 1,2,6"
+                "8. Otro"
         };
     }
 
