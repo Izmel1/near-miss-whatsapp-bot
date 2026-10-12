@@ -1,5 +1,5 @@
 const { app } = require("@azure/functions");
-const { getOrCreateSession } = require("../session/sessionStore");
+const { getOrCreateSession, saveSession } = require("../session/sessionStore");
 const processSession =
     require("../session/sessionProcessor");
 const submitReport = require("../services/submitReport");
@@ -14,7 +14,7 @@ const parseConsequences = require("../utils/parseConsequences");
 const { CONSEQUENCES, ALLOWED_IMAGE_TYPES, VERIFY_TOKEN } = require("../config/constants");
 
 
-// Sesiones temporales en memoria
+// Sesiones persistidas en Azure Table Storage
 
 
 
@@ -161,7 +161,7 @@ app.http("webhook", {
                 */
 
                 const session =
-                    getOrCreateSession(
+                    await getOrCreateSession(
                         normalizedMessage.userId
                     );
 
@@ -175,11 +175,12 @@ app.http("webhook", {
                     session.state
                 );
 
-                const result = await processSession(
-                    session,
-                    normalizedMessage,
-                    context
-                );
+                let result;
+                try {
+                    result = await processSession(session, normalizedMessage, context);
+                } finally {
+                    await saveSession(normalizedMessage.userId, session);
+                }
 
                 context.log(
                     "Estado después:",
