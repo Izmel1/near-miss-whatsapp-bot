@@ -1,3 +1,4 @@
+const { requestWithRetry } = require("./httpRequestService");
 const { getGraphAccessToken } = require("./sharePointService");
 
 const EXTENSIONS = {
@@ -27,15 +28,16 @@ async function uploadEvidenceFile({ buffer, fileName, mimeType } = {}) {
     const token = await getGraphAccessToken();
     let response;
     try {
-        response = await fetch(
+        response = await requestWithRetry(
             `https://graph.microsoft.com/v1.0/drives/${encodeURIComponent(driveId)}/root:/${encodeURIComponent(fileName)}:/content`,
             {
                 method: "PUT",
                 headers: { Authorization: `Bearer ${token}`, "Content-Type": mimeType },
                 body: buffer
-            }
+            }, { retryable: true }
         );
-    } catch {
+    } catch (error) {
+        if (error?.code === "EXTERNAL_HTTP_TIMEOUT" || error?.message?.startsWith("Invalid EXTERNAL_HTTP_")) throw error;
         throw new Error("Failed to upload SharePoint evidence: network error");
     }
     if (response.status !== 200 && response.status !== 201) {
@@ -121,11 +123,12 @@ async function updateEvidenceMetadata({
     const token = await getGraphAccessToken();
     let response;
     try {
-        response = await fetch(
+        response = await requestWithRetry(
             `https://graph.microsoft.com/v1.0/drives/${encodeURIComponent(environment.SHAREPOINT_EVIDENCIAS_DRIVE_ID)}/items/${encodeURIComponent(driveItemId)}?$expand=listItem`,
             { method: "GET", headers: { Authorization: `Bearer ${token}` } }
         );
-    } catch {
+    } catch (error) {
+        if (error?.code === "EXTERNAL_HTTP_TIMEOUT" || error?.message?.startsWith("Invalid EXTERNAL_HTTP_")) throw error;
         throw new Error("Failed to resolve SharePoint evidence ListItem: network error");
     }
     if (response.status !== 200) {
@@ -151,15 +154,16 @@ async function updateEvidenceMetadata({
         CanalOrigen: canalOrigen
     };
     try {
-        response = await fetch(
+        response = await requestWithRetry(
             `https://graph.microsoft.com/v1.0/sites/${encodeURIComponent(environment.SHAREPOINT_SITE_ID)}/lists/${encodeURIComponent(environment.SHAREPOINT_EVIDENCIAS_LIST_ID)}/items/${encodeURIComponent(listItemId)}/fields`,
             {
                 method: "PATCH",
                 headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
                 body: JSON.stringify(fields)
-            }
+            }, { retryable: true }
         );
-    } catch {
+    } catch (error) {
+        if (error?.code === "EXTERNAL_HTTP_TIMEOUT" || error?.message?.startsWith("Invalid EXTERNAL_HTTP_")) throw error;
         throw new Error("Failed to update SharePoint evidence metadata: network error");
     }
     if (response.status !== 200) {

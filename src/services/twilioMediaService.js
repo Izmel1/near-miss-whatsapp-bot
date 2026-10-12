@@ -1,3 +1,4 @@
+const { requestWithRetry } = require("./httpRequestService");
 const ALLOWED_TYPES = new Set(["image/jpeg", "image/jpg", "image/png"]);
 const INITIAL_HOST = "api.twilio.com";
 const REDIRECT_HOST = "mms.twiliocdn.com";
@@ -42,14 +43,15 @@ async function downloadTwilioMedia(media) {
     for (let redirects = 0; redirects <= MAX_REDIRECTS; redirects++) {
         let response;
         try {
-            response = await fetch(url.href, {
+            response = await requestWithRetry(url.href, {
                 method: "GET",
                 redirect: "manual",
                 headers: url.hostname === INITIAL_HOST
                     ? { Authorization: authorization }
                     : {}
             });
-        } catch {
+        } catch (error) {
+            if (error?.code === "EXTERNAL_HTTP_TIMEOUT" || error?.message?.startsWith("Invalid EXTERNAL_HTTP_")) throw error;
             throw new Error("Failed to download Twilio media: network error");
         }
         if (REDIRECT_STATUSES.has(response.status)) {

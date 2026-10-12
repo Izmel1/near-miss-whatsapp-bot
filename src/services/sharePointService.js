@@ -1,3 +1,4 @@
+const { requestWithRetry } = require("./httpRequestService");
 const generateFolio = require("../utils/generateFolio");
 
 function requireEnvironment(name) {
@@ -15,7 +16,7 @@ async function getGraphAccessToken() {
     let response;
 
     try {
-        response = await fetch(
+        response = await requestWithRetry(
             `https://login.microsoftonline.com/${encodeURIComponent(tenantId)}/oauth2/v2.0/token`,
             {
                 method: "POST",
@@ -26,9 +27,10 @@ async function getGraphAccessToken() {
                     scope: "https://graph.microsoft.com/.default",
                     grant_type: "client_credentials"
                 })
-            }
+            }, { retryable: true }
         );
-    } catch {
+    } catch (error) {
+        if (error?.code === "EXTERNAL_HTTP_TIMEOUT" || error?.message?.startsWith("Invalid EXTERNAL_HTTP_")) throw error;
         throw new Error("Microsoft Graph authentication failed: network error");
     }
 
@@ -58,11 +60,12 @@ async function getAreas() {
     while (url) {
         let response;
         try {
-            response = await fetch(url, {
+            response = await requestWithRetry(url, {
                 method: "GET",
                 headers: { Authorization: `Bearer ${token}` }
             });
-        } catch {
+        } catch (error) {
+            if (error?.code === "EXTERNAL_HTTP_TIMEOUT" || error?.message?.startsWith("Invalid EXTERNAL_HTTP_")) throw error;
             throw new Error("Failed to read SharePoint areas: network error");
         }
         if (!response.ok) {
@@ -119,11 +122,12 @@ async function getConsequences() {
     while (url) {
         let response;
         try {
-            response = await fetch(url, {
+            response = await requestWithRetry(url, {
                 method: "GET",
                 headers: { Authorization: `Bearer ${token}` }
             });
-        } catch {
+        } catch (error) {
+            if (error?.code === "EXTERNAL_HTTP_TIMEOUT" || error?.message?.startsWith("Invalid EXTERNAL_HTTP_")) throw error;
             throw new Error("Failed to read SharePoint consequences: network error");
         }
         if (!response.ok) {
@@ -280,7 +284,7 @@ async function createNearMissItem(report) {
     const token = await getGraphAccessToken();
     let response;
     try {
-        response = await fetch(
+        response = await requestWithRetry(
             `https://graph.microsoft.com/v1.0/sites/${encodeURIComponent(siteId)}/lists/${encodeURIComponent(listId)}/items`,
             {
                 method: "POST",
@@ -289,9 +293,10 @@ async function createNearMissItem(report) {
                     Authorization: `Bearer ${token}`
                 },
                 body: JSON.stringify(payload)
-            }
+            }, { retryable: false }
         );
-    } catch {
+    } catch (error) {
+        if (error?.code === "EXTERNAL_HTTP_TIMEOUT" || error?.message?.startsWith("Invalid EXTERNAL_HTTP_")) throw error;
         throw new Error("Failed to create SharePoint Near Miss: network error");
     }
     if (response.status !== 201) {
@@ -350,15 +355,16 @@ async function updateNearMissFolio(itemId, folio) {
     const token = await getGraphAccessToken();
     let response;
     try {
-        response = await fetch(
+        response = await requestWithRetry(
             `https://graph.microsoft.com/v1.0/sites/${encodeURIComponent(siteId)}/lists/${encodeURIComponent(listId)}/items/${Number(itemId)}/fields`,
             {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
                 body: JSON.stringify({ Folio: folio })
-            }
+            }, { retryable: true }
         );
-    } catch {
+    } catch (error) {
+        if (error?.code === "EXTERNAL_HTTP_TIMEOUT" || error?.message?.startsWith("Invalid EXTERNAL_HTTP_")) throw error;
         throw new Error("Failed to update SharePoint Near Miss Folio: network error");
     }
     if (response.status !== 200) {
