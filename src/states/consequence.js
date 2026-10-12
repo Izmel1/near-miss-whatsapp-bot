@@ -1,3 +1,4 @@
+const { safeLog, safeError } = require("../utils/safeLogger");
 const parseConsequences =
     require("../utils/parseConsequences");
 
@@ -7,14 +8,9 @@ function handleConsequence(session, normalizedMessage, context) {
     );
 
     if (!result.valid) {
-        context.log(
-            "Consecuencia inválida:",
-            normalizedMessage.text
-        );
+        safeLog(context, "Input rejected");
 
-        context.log(
-            "Opciones válidas: 1,2,3,4,5,6,7,8"
-        );
+        
 
         // No cambiamos de estado.
         return {
@@ -37,21 +33,14 @@ function handleConsequence(session, normalizedMessage, context) {
         session.data.consequences = result.values;
         session.updatedAt = new Date();
 
-        context.log(
-        "Consecuencias guardadas:",
-        JSON.stringify(
-            session.data.consequences
-        )
-    );
+        
 
     if (
         session.data.consequences.includes("Otro")
     ) {
         session.state = "OTHER_CONSEQUENCE";
 
-        context.log(
-            "Cambio de estado: CONSEQUENCE -> OTHER_CONSEQUENCE"
-        );
+        safeLog(context, "State transition", { fromState: "CONSEQUENCE", toState: "OTHER_CONSEQUENCE" });
 
         return {
             reply:
@@ -65,9 +54,7 @@ function handleConsequence(session, normalizedMessage, context) {
     } else {
         session.state = "PREVENTION";
 
-        context.log(
-            "Cambio de estado: CONSEQUENCE -> PREVENTION"
-        );
+        safeLog(context, "State transition", { fromState: "CONSEQUENCE", toState: "PREVENTION" });
 
         return {
             reply:

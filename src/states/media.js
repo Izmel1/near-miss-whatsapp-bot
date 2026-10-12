@@ -1,3 +1,4 @@
+const { safeLog, safeError } = require("../utils/safeLogger");
 const { ALLOWED_IMAGE_TYPES } =
     require("../config/constants");
 
@@ -25,13 +26,13 @@ function handleMedia(session, normalizedMessage, context) {
 
         for (const item of mediaItems) {
             if (!ALLOWED_IMAGE_TYPES.includes(item?.mimeType)) {
-                context.log("Formato de imagen no permitido:", item?.mimeType);
+                safeLog(context, "Input rejected");
                 continue;
             }
 
             allowedFound = true;
             if (session.data.images.length >= 5) {
-                context.log("Límite máximo de 5 imágenes alcanzado");
+                safeLog(context, "Image limit reached");
                 break;
             }
 
@@ -47,8 +48,8 @@ function handleMedia(session, normalizedMessage, context) {
             accepted++;
             session.data.hasEvidence = true;
             session.updatedAt = new Date();
-            context.log("Imagen registrada:", item.imageId);
-            context.log("Total de imágenes:", session.data.images.length);
+            safeLog(context, "Image received");
+            safeLog(context, "Image received", { evidenceCount: session.data.images.length });
         }
 
         if (!allowedFound) {
@@ -63,8 +64,8 @@ function handleMedia(session, normalizedMessage, context) {
         if (session.data.images.length >= 5) {
             session.state = "SUBMIT";
             session.updatedAt = new Date();
-            context.log("Máximo de 5 imágenes recibido");
-            context.log(`Cambio de estado: ${previousState} -> SUBMIT`);
+            safeLog(context, "Image limit reached");
+            safeLog(context, "State transition", { fromState: previousState, toState: session.state });
 
             return {
                 reply: (accepted === 0
@@ -76,8 +77,8 @@ function handleMedia(session, normalizedMessage, context) {
         }
 
         session.state = "MEDIA_MORE";
-        context.log(`Cambio de estado: ${previousState} -> MEDIA_MORE`);
-        context.log("¿Deseas agregar más imágenes? 1 = Sí, 2 = Enviar reporte");
+        safeLog(context, "State transition", { fromState: previousState, toState: session.state });
+        
 
         return {
             reply:
@@ -114,18 +115,11 @@ function handleMedia(session, normalizedMessage, context) {
             session.state = "SUBMIT";
             session.updatedAt = new Date();
 
-            context.log(
-                "Usuario decidió continuar"
-            );
+            
 
-            context.log(
-                "Tiene evidencia:",
-                session.data.hasEvidence
-            );
+            
 
-            context.log(
-                "Cambio de estado: MEDIA -> SUBMIT"
-            );
+            safeLog(context, "State transition", { fromState: "MEDIA", toState: "SUBMIT" });
 
             return {
                 reply:
@@ -136,14 +130,9 @@ function handleMedia(session, normalizedMessage, context) {
         }
 
 
-        context.log(
-            "Entrada no válida en MEDIA:",
-            normalizedMessage.text
-        );
+        
 
-        context.log(
-            "Debe enviar una imagen o escribir Continuar"
-        );
+        
 
         return {
             reply:
@@ -153,10 +142,7 @@ function handleMedia(session, normalizedMessage, context) {
         };
     }
 
-    context.log(
-        "Tipo de mensaje no soportado en MEDIA:",
-        normalizedMessage.type
-    );
+    safeLog(context, "Input rejected");
 
     return {
         reply:

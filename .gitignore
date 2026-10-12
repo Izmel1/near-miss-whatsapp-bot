@@ -116,3 +116,7 @@ __azurite_db*__.json
 # Azurite local storage and database files
 __tablestorage__/
 __azurite_db*__.json.*
+
+# Local deployment packages
+near-miss-deploy.zip
+near-miss-deploy-*.zip

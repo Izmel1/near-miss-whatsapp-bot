@@ -1,8 +1,9 @@
+const { safeLog, safeError } = require("../utils/safeLogger");
 const handleMedia = require("./media");
 
 function handleMediaMore(session, normalizedMessage, context) {
     if (normalizedMessage.type === "image") {
-        context.log("Imagen recibida directamente en MEDIA_MORE");
+        
 
         return handleMedia(session, normalizedMessage, context);
     }
@@ -18,13 +19,9 @@ function handleMediaMore(session, normalizedMessage, context) {
         session.state = "MEDIA";
         session.updatedAt = new Date();
 
-        context.log(
-            "Usuario desea agregar otra imagen"
-        );
+        
 
-        context.log(
-            "Cambio de estado: MEDIA_MORE -> MEDIA"
-        );
+        safeLog(context, "State transition", { fromState: "MEDIA_MORE", toState: "MEDIA" });
 
         return {
             reply:
@@ -37,13 +34,9 @@ function handleMediaMore(session, normalizedMessage, context) {
         session.state = "SUBMIT";
         session.updatedAt = new Date();
 
-        context.log(
-            "Usuario decidió enviar el reporte"
-        );
+        
 
-        context.log(
-            "Cambio de estado: MEDIA_MORE -> SUBMIT"
-        );
+        safeLog(context, "State transition", { fromState: "MEDIA_MORE", toState: "SUBMIT" });
 
         return {
             reply:
@@ -53,14 +46,9 @@ function handleMediaMore(session, normalizedMessage, context) {
         };
     }
 
-    context.log(
-        "Respuesta inválida en MEDIA_MORE:",
-        normalizedMessage.text
-    );
+    safeLog(context, "Input rejected");
 
-    context.log(
-        "Opciones válidas: 1 = Sí, 2 = Enviar reporte"
-    );
+    
 
     return {
         reply:

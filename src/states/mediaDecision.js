@@ -1,3 +1,4 @@
+const { safeLog, safeError } = require("../utils/safeLogger");
 function handleMediaDecision(session, normalizedMessage, context) {
     const rawOption = normalizedMessage.text;
     const option =
@@ -12,13 +13,9 @@ function handleMediaDecision(session, normalizedMessage, context) {
         session.state = "MEDIA";
         session.updatedAt = new Date();
 
-        context.log(
-            "Usuario indicó que sí tiene fotografías"
-        );
+        
 
-        context.log(
-            "Cambio de estado: MEDIA_DECISION -> MEDIA"
-        );
+        safeLog(context, "State transition", { fromState: "MEDIA_DECISION", toState: "MEDIA" });
 
         return {
             reply:
@@ -36,13 +33,9 @@ function handleMediaDecision(session, normalizedMessage, context) {
         session.state = "SUBMIT";
         session.updatedAt = new Date();
 
-        context.log(
-            "Usuario indicó que no tiene fotografías"
-        );
+        
 
-        context.log(
-            "Cambio de estado: MEDIA_DECISION -> SUBMIT"
-        );
+        safeLog(context, "State transition", { fromState: "MEDIA_DECISION", toState: "SUBMIT" });
 
         return {
             reply:
@@ -52,14 +45,9 @@ function handleMediaDecision(session, normalizedMessage, context) {
         };
     }
 
-    context.log(
-        "Respuesta inválida en MEDIA_DECISION:",
-        normalizedMessage.text
-    );
+    safeLog(context, "Input rejected");
 
-    context.log(
-        "Opciones válidas: 1 = Sí, 2 = No"
-    );
+    
 
     return {
         reply:

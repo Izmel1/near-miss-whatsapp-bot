@@ -1,7 +1,8 @@
+const { safeLog, safeError } = require("../utils/safeLogger");
 function handleStart(session, context) {
     session.state = "IDENTITY";
 
-    context.log("Cambio de estado: START -> IDENTITY");
+    safeLog(context, "State transition", { fromState: "START", toState: "IDENTITY" });
 
     return {
         reply:

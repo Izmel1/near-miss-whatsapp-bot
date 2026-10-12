@@ -1,3 +1,4 @@
+const { safeLog, safeError } = require("../utils/safeLogger");
 const generateFolio = require("../utils/generateFolio");
 const { createNearMissItem, findNearMissByEventId, updateNearMissFolio } = require("./sharePointService");
 const { persistEvidenceImages } = require("./evidenceService");
@@ -96,10 +97,10 @@ async function submitReport(session, userId, context) {
     session.data.evidenceCount = evidenceResults.length;
     session.state = "COMPLETE";
     session.updatedAt = new Date();
-    context.log("Near Miss persisted in SharePoint");
-    context.log("SharePoint item ID:", created.id);
-    context.log("Folio:", created.folio);
-    context.log("Evidence images persisted:", evidenceResults.length);
+    safeLog(context, "Report submission completed", { operation: "submit" });
+    
+    
+    safeLog(context, "Evidence persistence completed", { evidenceCount: evidenceResults.length });
     return {
         id: created.id,
         folio: created.folio,

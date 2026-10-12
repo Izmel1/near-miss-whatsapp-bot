@@ -1,3 +1,4 @@
+const { safeLog, safeError } = require("../utils/safeLogger");
 function handleOtherConsequence(session, normalizedMessage, context) {
     const rawOtherConsequence = normalizedMessage.text;
 
@@ -5,9 +6,7 @@ function handleOtherConsequence(session, normalizedMessage, context) {
         typeof rawOtherConsequence !== "string" ||
         rawOtherConsequence.trim() === ""
     ) {
-        context.log(
-            "Descripción de otra consecuencia vacía"
-        );
+        safeLog(context, "Input rejected");
 
         return {
             reply:
@@ -25,14 +24,9 @@ function handleOtherConsequence(session, normalizedMessage, context) {
     session.state = "PREVENTION";
     session.updatedAt = new Date();
 
-    context.log(
-        "Otra consecuencia guardada:",
-        session.data.otherConsequence
-    );
+    
 
-    context.log(
-        "Cambio de estado: OTHER_CONSEQUENCE -> PREVENTION"
-    );
+    safeLog(context, "State transition", { fromState: "OTHER_CONSEQUENCE", toState: "PREVENTION" });
 
     return {
         reply:

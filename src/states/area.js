@@ -1,3 +1,4 @@
+const { safeLog, safeError } = require("../utils/safeLogger");
 const parseArea = require("../utils/parseArea");
 const { AREAS } = require("../config/constants");
 
@@ -5,7 +6,7 @@ function handleArea(session, normalizedMessage, context) {
     const result = parseArea(normalizedMessage.text);
 
     if (!result.valid) {
-        context.log("Área inválida:", normalizedMessage.text);
+        safeLog(context, "Input rejected");
 
         const areaMenu = Object.entries(AREAS)
             .map(([code, name]) => `${code}. ${name}`)
@@ -23,14 +24,9 @@ function handleArea(session, normalizedMessage, context) {
     session.data.area = result.value;
     session.state = "DESCRIPTION";
 
-    context.log(
-    "Área guardada:",
-    session.data.area
-);
+    
 
-    context.log(
-    "Cambio de estado: AREA -> DESCRIPTION"
-);
+    safeLog(context, "State transition", { fromState: "AREA", toState: "DESCRIPTION" });
 
     return {
         reply:

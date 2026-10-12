@@ -1,3 +1,4 @@
+const { safeLog, safeError } = require("../utils/safeLogger");
 const {AREAS} = require ("../config/constants");
 
 function handleIdentity(session, normalizedMessage, context) {
@@ -7,7 +8,7 @@ function handleIdentity(session, normalizedMessage, context) {
         typeof rawIdentity !== "string" ||
         rawIdentity.trim() === ""
     ) {
-        context.log("Identificación inválida");
+        safeLog(context, "Input rejected");
 
         return {
             reply:
@@ -21,14 +22,9 @@ function handleIdentity(session, normalizedMessage, context) {
     session.data.identity = identity;
     session.state = "AREA";
 
-    context.log(
-        "Identidad guardada:",
-        session.data.identity
-    );
+    
 
-    context.log(
-        "Cambio de estado: IDENTITY -> AREA"
-    );
+    safeLog(context, "State transition", { fromState: "IDENTITY", toState: "AREA" });
 
     const areaMenu = Object.entries(AREAS)
         .map(([code, name]) => `${code}. ${name}`)

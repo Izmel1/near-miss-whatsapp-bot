@@ -1,3 +1,4 @@
+const { safeLog, safeError } = require("../utils/safeLogger");
 function handleDescription(session, normalizedMessage, context) {
         const rawDescription = normalizedMessage.text;
 
@@ -5,7 +6,7 @@ function handleDescription(session, normalizedMessage, context) {
             typeof rawDescription !== "string" ||
             rawDescription.trim() === ""
         ) {
-            context.log("Descripción inválida");
+            safeLog(context, "Input rejected");
 
             return {
                 reply:
@@ -21,14 +22,9 @@ function handleDescription(session, normalizedMessage, context) {
         session.state = "LOCATION";
         session.updatedAt = new Date();
 
-        context.log(
-        "Descripción guardada:",
-        session.data.description
-        );
+        
 
-context.log(
-    "Cambio de estado: DESCRIPTION -> LOCATION"
-);
+safeLog(context, "State transition", { fromState: "DESCRIPTION", toState: "LOCATION" });
 
     return {
         reply:

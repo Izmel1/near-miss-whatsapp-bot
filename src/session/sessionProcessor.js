@@ -1,3 +1,4 @@
+const { safeLog, safeError } = require("../utils/safeLogger");
 const handleStart = require("../states/start");
 const handleIdentity = require("../states/identity");
 const handleArea = require("../states/area");
@@ -113,15 +114,12 @@ case "SUBMIT":
     break;
 
 case "COMPLETE":
-    context.log("Reporte completado");
+    safeLog(context, "Report complete");
 
     break;
 
 default:
-    context.log(
-        "Estado aún no implementado:",
-        session.state
-    );
+    safeLog(context, "Unsupported state");
     break;
     }
 

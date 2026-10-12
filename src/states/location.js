@@ -1,3 +1,4 @@
+const { safeLog, safeError } = require("../utils/safeLogger");
 const {CONSEQUENCES} = require ("../config/constants")
 
 function handleLocation(session, normalizedMessage, context) {
@@ -7,7 +8,7 @@ function handleLocation(session, normalizedMessage, context) {
         typeof rawLocation !== "string" ||
         rawLocation.trim() === ""
     ) {
-        context.log("Ubicación inválida");
+        safeLog(context, "Input rejected");
 
         return {
             reply:
@@ -23,18 +24,13 @@ function handleLocation(session, normalizedMessage, context) {
     session.state = "CONSEQUENCE";
     session.updatedAt = new Date();
 
-    context.log(
-    "Ubicación guardada:",
-    session.data.location
-);
+    
 
 const Menuconsecuencia = Object.entries(CONSEQUENCES)
         .map(([code, name]) => `${code}. ${name}`)
         .join("\n");
 
-context.log(
-    "Cambio de estado: LOCATION -> CONSEQUENCE"
-);
+safeLog(context, "State transition", { fromState: "LOCATION", toState: "CONSEQUENCE" });
 
     return {
         reply:

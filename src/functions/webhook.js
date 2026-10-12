@@ -1,3 +1,4 @@
+const { safeLog, safeError } = require("../utils/safeLogger");
 const { app } = require("@azure/functions");
 const { validateTwilioWebhook } = require("../services/twilioWebhookValidationService");
 const { getSession, getOrCreateSession, saveSession } = require("../session/sessionStore");
@@ -47,18 +48,14 @@ app.http("webhook", {
             const challenge =
                 request.query.get("hub.challenge");
 
-            context.log(
-                "Intento de verificación recibido"
-            );
+            safeLog(context, "Webhook verification requested");
 
             if (
                 mode === "subscribe" &&
                 token === VERIFY_TOKEN
             ) {
 
-                context.log(
-                    "Webhook verificado correctamente"
-                );
+                safeLog(context, "Webhook verification succeeded");
 
                 return {
                     status: 200,
@@ -66,9 +63,7 @@ app.http("webhook", {
                 };
             }
 
-            context.log(
-                "Verificación rechazada"
-            );
+            safeLog(context, "Webhook verification rejected");
 
             return {
                 status: 403,
@@ -95,9 +90,7 @@ app.http("webhook", {
                     .split(";")[0].trim().toLowerCase();
                 let normalizedMessage;
 
-                context.log(
-                    "Webhook recibido"
-                );
+                safeLog(context, "Webhook received", { operation: "webhook" });
 
                 // Twilio: los mensajes llegan como formulario URL-encoded.
                 if (contentType === "application/x-www-form-urlencoded") {
@@ -114,9 +107,10 @@ app.http("webhook", {
                     }
                     const signature = request.headers.get("X-Twilio-Signature");
                     if (!validateTwilioWebhook({ signature, params })) {
-                        context.log("Invalid Twilio webhook signature");
+                        safeLog(context, "Twilio signature rejected", { status: 403 });
                         return { status: 403, body: "FORBIDDEN" };
                     }
+                    safeLog(context, "Twilio signature validated", { operation: "validation" });
                     normalizedMessage = await normalizeTwilioMessage({ text: async () => rawBody });
                 } else {
                     // Meta y simulaciones: se conserva la lectura del JSON actual.
@@ -144,9 +138,7 @@ app.http("webhook", {
 
                     if (!message) {
 
-                        context.log(
-                            "No se encontró mensaje en el payload"
-                        );
+                        safeLog(context, "Webhook event ignored");
 
                         return {
                             status: 200,
@@ -171,11 +163,13 @@ app.http("webhook", {
                 if (isTwilio) {
                     const claim = await claimMessage(normalizedMessage.messageId);
                     if (claim.status === "COMPLETED") {
+                        safeLog(context, "Message duplicate", { duplicate: true, operation: "message_claim" });
                         return claim.reply !== null
                             ? twimlResponse(claim.reply)
                             : { status: 200, body: "EVENT_RECEIVED" };
                     }
                     if (claim.status === "PROCESSING") {
+                        safeLog(context, "Message duplicate", { duplicate: true, operation: "message_claim" });
                         return {
                             status: 200,
                             headers: { "Content-Type": "text/xml; charset=utf-8" },
@@ -183,14 +177,17 @@ app.http("webhook", {
                         };
                     }
                     claimedMessageId = normalizedMessage.messageId;
+                    safeLog(context, "Message claimed", { reclaimed: claim.reclaimed, operation: "message_claim" });
                     claimToken = claim.token;
                     const lock = await acquireSessionLock(normalizedMessage.userId);
                     if (lock.status === "BUSY") {
+                        safeLog(context, "Session lock busy", { operation: "lock", status: 503 });
                         await releaseMessage(claimedMessageId, claimToken);
                         claimedMessageId = undefined;
                         return { status: 503, body: "SESSION_BUSY" };
                     }
                     lockedUserId = normalizedMessage.userId;
+                    safeLog(context, "Session lock acquired", { operation: "lock" });
                     lockToken = lock.token;
                     heartbeat = startSessionLockHeartbeat(lockedUserId, lockToken);
                     const persistedSession = await getSession(normalizedMessage.userId);
@@ -198,6 +195,7 @@ app.http("webhook", {
                         ? findMessageReceipt(persistedSession, normalizedMessage.messageId)
                         : null;
                     if (receipt) {
+                        safeLog(context, "Message receipt recovered", { duplicate: true });
                         heartbeat.throwIfFailed();
                         await completeMessage(normalizedMessage.messageId, claimToken, receipt.reply);
                         claimedMessageId = undefined;
@@ -218,15 +216,9 @@ app.http("webhook", {
                         normalizedMessage.userId
                     );
 
-                context.log(
-                    "Event ID:",
-                    session.eventId
-                );
+                
 
-                context.log(
-                    "Estado antes:",
-                    session.state
-                );
+                safeLog(context, "Session loaded", { state: session.state });
 
                 let result;
                 let processingError;
@@ -245,7 +237,7 @@ app.http("webhook", {
                     await saveSession(normalizedMessage.userId, session);
                 } catch (error) {
                     if (!processingError) throw error;
-                    context.error("Failed to save session after processing failure");
+                    safeError(context, "Operation failed", undefined, { operation: "session_save" });
                 }
                 heartbeat?.throwIfFailed();
                 if (processingError) throw processingError;
@@ -255,10 +247,7 @@ app.http("webhook", {
                     claimedMessageId = undefined;
                 }
 
-                context.log(
-                    "Estado después:",
-                    session.state
-                );
+                
 
 
                 if (
@@ -278,12 +267,10 @@ app.http("webhook", {
                     try {
                         await releaseMessage(claimedMessageId, claimToken);
                     } catch {
-                        context.error("Failed to release message idempotency claim");
+                        safeError(context, "Operation failed", undefined, { operation: "message_release" });
                     }
                 }
-                context.error(error?.code === "TWILIO_VALIDATION_CONFIGURATION"
-                    ? "Twilio webhook validation is not configured"
-                    : "Error procesando webhook");
+                safeError(context, "Operation failed", error, { operation: "webhook" });
 
                 return {
                     status: 500,
@@ -294,14 +281,14 @@ app.http("webhook", {
                     try {
                         await heartbeat.stop();
                     } catch {
-                        context.error("Failed to stop session lock heartbeat");
+                        safeError(context, "Operation failed", undefined, { operation: "heartbeat_stop" });
                     }
                 }
                 if (lockToken) {
                     try {
                         await releaseSessionLock(lockedUserId, lockToken);
                     } catch {
-                        context.error("Failed to release session lock");
+                        safeError(context, "Operation failed", undefined, { operation: "lock_release" });
                     }
                 }
             }

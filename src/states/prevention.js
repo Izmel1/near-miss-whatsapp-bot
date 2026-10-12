@@ -1,3 +1,4 @@
+const { safeLog, safeError } = require("../utils/safeLogger");
 function handlePrevention(session, normalizedMessage, context) {
     const rawPrevention = normalizedMessage.text;
 
@@ -5,9 +6,7 @@ function handlePrevention(session, normalizedMessage, context) {
         typeof rawPrevention !== "string" ||
         rawPrevention.trim() === ""
     ) {
-        context.log(
-            "Propuesta preventiva vacía"
-        );
+        safeLog(context, "Input rejected");
 
         return {
             reply:
@@ -26,14 +25,9 @@ function handlePrevention(session, normalizedMessage, context) {
 
     
 
-    context.log(
-        "Propuesta preventiva guardada:",
-        session.data.prevention
-    );
+    
 
-    context.log(
-        "Cambio de estado: PREVENTION -> MEDIA_DECISION"
-    );
+    safeLog(context, "State transition", { fromState: "PREVENTION", toState: "MEDIA_DECISION" });
 
     return {
         reply:
