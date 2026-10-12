@@ -2,7 +2,7 @@ const { app } = require("@azure/functions");
 const { getSession, getOrCreateSession, saveSession } = require("../session/sessionStore");
 const { findMessageReceipt, recordMessageReceipt } = require("../services/sessionMessageReceiptService");
 const { claimMessage, completeMessage, releaseMessage } = require("../services/messageIdempotencyService");
-const { acquireSessionLock, releaseSessionLock } = require("../services/sessionLockService");
+const { acquireSessionLock, releaseSessionLock, startSessionLockHeartbeat } = require("../services/sessionLockService");
 const processSession =
     require("../session/sessionProcessor");
 const submitReport = require("../services/submitReport");
@@ -86,6 +86,7 @@ app.http("webhook", {
             let claimToken;
             let lockedUserId;
             let lockToken;
+            let heartbeat;
 
             try {
 
@@ -174,11 +175,13 @@ app.http("webhook", {
                     }
                     lockedUserId = normalizedMessage.userId;
                     lockToken = lock.token;
+                    heartbeat = startSessionLockHeartbeat(lockedUserId, lockToken);
                     const persistedSession = await getSession(normalizedMessage.userId);
                     const receipt = persistedSession
                         ? findMessageReceipt(persistedSession, normalizedMessage.messageId)
                         : null;
                     if (receipt) {
+                        heartbeat.throwIfFailed();
                         await completeMessage(normalizedMessage.messageId, claimToken, receipt.reply);
                         claimedMessageId = undefined;
                         return receipt.reply !== null
@@ -210,22 +213,27 @@ app.http("webhook", {
 
                 let result;
                 let processingError;
+                heartbeat?.throwIfFailed();
                 try {
                     result = await processSession(session, normalizedMessage, context);
+                    heartbeat?.throwIfFailed();
                     if (isTwilio) {
                         recordMessageReceipt(session, normalizedMessage.messageId, result?.reply ?? null);
                     }
                 } catch (error) {
                     processingError = error;
                 }
+                heartbeat?.throwIfFailed();
                 try {
                     await saveSession(normalizedMessage.userId, session);
                 } catch (error) {
                     if (!processingError) throw error;
                     context.error("Failed to save session after processing failure");
                 }
+                heartbeat?.throwIfFailed();
                 if (processingError) throw processingError;
                 if (isTwilio) {
+                    heartbeat.throwIfFailed();
                     await completeMessage(normalizedMessage.messageId, claimToken, result?.reply ?? null);
                     claimedMessageId = undefined;
                 }
@@ -263,6 +271,13 @@ app.http("webhook", {
                     body: "ERROR"
                 };
             } finally {
+                if (heartbeat) {
+                    try {
+                        await heartbeat.stop();
+                    } catch {
+                        context.error("Failed to stop session lock heartbeat");
+                    }
+                }
                 if (lockToken) {
                     try {
                         await releaseSessionLock(lockedUserId, lockToken);

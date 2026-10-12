@@ -95,4 +95,77 @@ async function releaseSessionLock(userId, token) {
     }
 }
 
-module.exports = { acquireSessionLock, releaseSessionLock };
+async function renewSessionLock(userId, token) {
+    const rowKey = sessionKey(userId);
+    if (typeof token !== "string" || !token.trim()) throw new Error("Invalid session lock token");
+    const ttl = lockMilliseconds();
+    const client = await getClient();
+    let entity;
+    try {
+        entity = await client.getEntity(PARTITION_KEY, rowKey);
+    } catch (error) {
+        if (error?.statusCode === 404) throw new Error("Session lock ownership lost");
+        throw new Error("Failed to read session lock for renewal");
+    }
+    if (entity.lockToken !== token) throw new Error("Session lock ownership lost");
+    if (!entity.etag) throw new Error("Invalid stored session lock ETag");
+    const now = Date.now();
+    try {
+        await client.updateEntity({
+            partitionKey: PARTITION_KEY, rowKey,
+            updatedAt: new Date(now).toISOString(),
+            expiresAt: new Date(now + ttl).toISOString()
+        }, "Merge", { etag: entity.etag });
+    } catch (error) {
+        if (error?.statusCode === 412 || error?.statusCode === 404) {
+            throw new Error("Session lock ownership lost");
+        }
+        throw new Error("Failed to renew session lock");
+    }
+}
+
+function startSessionLockHeartbeat(userId, token) {
+    sessionKey(userId);
+    if (typeof token !== "string" || !token.trim()) throw new Error("Invalid session lock token");
+    const ttl = lockMilliseconds();
+    const raw = process.env.SESSION_LOCK_RENEW_SECONDS;
+    const seconds = raw === undefined ? 30 : Number(raw);
+    if ((raw !== undefined && !/^\d+$/.test(raw)) || !Number.isInteger(seconds) ||
+        seconds < 1 || seconds > 299 || seconds * 1000 >= ttl) {
+        throw new Error("Invalid SESSION_LOCK_RENEW_SECONDS: expected 1 to 299 and less than SESSION_LOCK_SECONDS");
+    }
+    let stopped = false;
+    let failure;
+    let timer;
+    let wake;
+    const running = (async () => {
+        try {
+            while (!stopped) {
+                await new Promise(resolve => {
+                    wake = resolve;
+                    timer = setTimeout(resolve, seconds * 1000);
+                });
+                clearTimeout(timer);
+                timer = undefined;
+                wake = undefined;
+                if (stopped) break;
+                await renewSessionLock(userId, token);
+            }
+        } catch (error) {
+            failure = error;
+        }
+    })();
+    return {
+        throwIfFailed() {
+            if (failure) throw failure;
+        },
+        async stop() {
+            stopped = true;
+            if (timer !== undefined) clearTimeout(timer);
+            if (wake) wake();
+            await running;
+        }
+    };
+}
+
+module.exports = { acquireSessionLock, releaseSessionLock, renewSessionLock, startSessionLockHeartbeat };
