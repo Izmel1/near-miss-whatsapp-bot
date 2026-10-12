@@ -1,5 +1,6 @@
 const { app } = require("@azure/functions");
 const { getOrCreateSession, saveSession } = require("../session/sessionStore");
+const { claimMessage, completeMessage, releaseMessage } = require("../services/messageIdempotencyService");
 const processSession =
     require("../session/sessionProcessor");
 const submitReport = require("../services/submitReport");
@@ -79,6 +80,7 @@ app.http("webhook", {
         */
 
         if (request.method === "POST") {
+            let claimedMessageId;
 
             try {
 
@@ -142,17 +144,23 @@ app.http("webhook", {
                     return { status: 400, body: "INVALID_MESSAGE" };
                 }
 
-                context.log(
-                    "MENSAJE NORMALIZADO:"
-                );
-
-                context.log(
-                    JSON.stringify(
-                        normalizedMessage,
-                        null,
-                        2
-                    )
-                );
+                const isTwilio = contentType === "application/x-www-form-urlencoded";
+                if (isTwilio) {
+                    const claim = await claimMessage(normalizedMessage.messageId);
+                    if (claim.status === "COMPLETED") {
+                        return claim.reply !== null
+                            ? twimlResponse(claim.reply)
+                            : { status: 200, body: "EVENT_RECEIVED" };
+                    }
+                    if (claim.status === "PROCESSING") {
+                        return {
+                            status: 200,
+                            headers: { "Content-Type": "text/xml; charset=utf-8" },
+                            body: '<?xml version="1.0" encoding="UTF-8"?><Response></Response>'
+                        };
+                    }
+                    claimedMessageId = normalizedMessage.messageId;
+                }
 
                 /*
                 =================================================
@@ -176,10 +184,22 @@ app.http("webhook", {
                 );
 
                 let result;
+                let processingError;
                 try {
                     result = await processSession(session, normalizedMessage, context);
-                } finally {
+                } catch (error) {
+                    processingError = error;
+                }
+                try {
                     await saveSession(normalizedMessage.userId, session);
+                } catch (error) {
+                    if (!processingError) throw error;
+                    context.error("Failed to save session after processing failure");
+                }
+                if (processingError) throw processingError;
+                if (isTwilio) {
+                    await completeMessage(normalizedMessage.messageId, result?.reply ?? null);
+                    claimedMessageId = undefined;
                 }
 
                 context.log(
@@ -187,14 +207,6 @@ app.http("webhook", {
                     session.state
                 );
 
-                context.log(
-                    "Datos acumulados:",
-                    JSON.stringify(
-                        session.data,
-                        null,
-                        2
-                    )
-                );
 
                 if (
                     contentType === "application/x-www-form-urlencoded" &&
@@ -209,11 +221,14 @@ app.http("webhook", {
                 };
 
             } catch (error) {
-
-                context.error(
-                    "Error procesando webhook:",
-                    error
-                );
+                if (claimedMessageId) {
+                    try {
+                        await releaseMessage(claimedMessageId);
+                    } catch {
+                        context.error("Failed to release message idempotency claim");
+                    }
+                }
+                context.error("Error procesando webhook");
 
                 return {
                     status: 500,
