@@ -39,8 +39,9 @@ function handleIdentity(session, normalizedMessage, context) {
         reply:
             "✅ Identificación registrada.\n\n" +
             "¿En qué área ocurrió o detectaste el Near Miss?\n\n" +
-            areaMenu + "\n\n" +
-            "Escribe únicamente el número de la opción."
+            "Escribe únicamente el número de la opción." + "\n\n" +
+            areaMenu
+            
     };
 }
 
