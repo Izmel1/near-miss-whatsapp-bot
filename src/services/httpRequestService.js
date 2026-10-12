@@ -21,7 +21,7 @@ function retryDelay(response, base, attempt) {
     return Math.min(MAX_DELAY_MS, base * 2 ** (attempt - 1));
 }
 
-async function requestWithRetry(url, options = {}, { retryable } = {}) {
+async function requestWithRetry(url, options = {}, { retryable, consume } = {}) {
     const timeout = setting("EXTERNAL_HTTP_TIMEOUT_MS", 15000, 1000, 60000);
     const configuredAttempts = setting("EXTERNAL_HTTP_MAX_ATTEMPTS", 3, 1, 5);
     const base = setting("EXTERNAL_HTTP_RETRY_BASE_MS", 500, 100, 5000);
@@ -34,9 +34,15 @@ async function requestWithRetry(url, options = {}, { retryable } = {}) {
         const timer = setTimeout(() => controller.abort(), timeout);
         let response;
         let error;
+        let consumed;
         try {
             response = await fetch(url, { ...options, signal: controller.signal });
-        } catch {
+            if (consume && !TRANSIENT_STATUSES.has(response.status)) {
+                consumed = await consume(response, controller.signal);
+            }
+            if (controller.signal.aborted) throw new Error("Aborted");
+        } catch (caught) {
+            if (caught?.code === "EVIDENCE_VALIDATION") throw caught;
             error = new Error(controller.signal.aborted
                 ? "External request timed out"
                 : "External request failed: network error");
@@ -45,7 +51,7 @@ async function requestWithRetry(url, options = {}, { retryable } = {}) {
             clearTimeout(timer);
         }
         if (!error && (!TRANSIENT_STATUSES.has(response.status) || attempt === attempts)) {
-            return response;
+            return consume && !TRANSIENT_STATUSES.has(response.status) ? consumed : response;
         }
         if (attempt === attempts) throw error;
         const delay = retryDelay(response, base, attempt);
@@ -59,4 +65,8 @@ async function requestWithRetry(url, options = {}, { retryable } = {}) {
     }
 }
 
-module.exports = { requestWithRetry };
+function requestWithRetryAndConsume(url, options, consume, policy = {}) {
+    return requestWithRetry(url, options, { ...policy, consume });
+}
+
+module.exports = { requestWithRetry, requestWithRetryAndConsume };

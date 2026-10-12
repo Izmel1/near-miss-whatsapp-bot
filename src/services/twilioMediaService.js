@@ -1,5 +1,5 @@
-const { requestWithRetry } = require("./httpRequestService");
-const ALLOWED_TYPES = new Set(["image/jpeg", "image/jpg", "image/png"]);
+const { maxEvidenceBytes, normalizeMime, validateEvidenceBuffer, readEvidenceBuffer } = require("./evidenceValidationService");
+const { requestWithRetryAndConsume } = require("./httpRequestService");
 const INITIAL_HOST = "api.twilio.com";
 const REDIRECT_HOST = "mms.twiliocdn.com";
 const REDIRECT_STATUSES = new Set([301, 302, 303, 307, 308]);
@@ -33,9 +33,8 @@ async function downloadTwilioMedia(media) {
         throw new Error("Invalid Twilio media URL");
     }
     let url = validateUrl(media.mediaUrl.trim());
-    if (!ALLOWED_TYPES.has(media.mimeType)) {
-        throw new Error("Unsupported Twilio media type");
-    }
+    const limit = maxEvidenceBytes();
+    normalizeMime(media.mimeType);
     const apiKey = requireEnvironment("TWILIO_API_KEY");
     const apiSecret = requireEnvironment("TWILIO_API_SECRET");
     const authorization = `Basic ${Buffer.from(`${apiKey}:${apiSecret}`).toString("base64")}`;
@@ -43,15 +42,22 @@ async function downloadTwilioMedia(media) {
     for (let redirects = 0; redirects <= MAX_REDIRECTS; redirects++) {
         let response;
         try {
-            response = await requestWithRetry(url.href, {
+            response = await requestWithRetryAndConsume(url.href, {
                 method: "GET",
                 redirect: "manual",
                 headers: url.hostname === INITIAL_HOST
                     ? { Authorization: authorization }
                     : {}
+            }, async (response, signal) => {
+                if (response.status < 200 || response.status >= 300) return response;
+                const httpMime = response.headers.get("content-type");
+                normalizeMime(httpMime);
+                const buffer = await readEvidenceBuffer(response, signal, limit);
+                const detected = validateEvidenceBuffer(buffer, media.mimeType, httpMime);
+                return { buffer, mimeType: detected.mimeType, size: buffer.length };
             });
         } catch (error) {
-            if (error?.code === "EXTERNAL_HTTP_TIMEOUT" || error?.message?.startsWith("Invalid EXTERNAL_HTTP_")) throw error;
+            if (error?.code === "EVIDENCE_VALIDATION" || error?.code === "EXTERNAL_HTTP_TIMEOUT" || error?.message?.startsWith("Invalid EXTERNAL_HTTP_")) throw error;
             throw new Error("Failed to download Twilio media: network error");
         }
         if (REDIRECT_STATUSES.has(response.status)) {
@@ -66,25 +72,11 @@ async function downloadTwilioMedia(media) {
             url = nextUrl;
             continue;
         }
+        if (response.buffer) return response;
         if (response.status < 200 || response.status >= 300) {
             throw new Error(`Failed to download Twilio media: HTTP ${response.status}`);
         }
-        const mimeType = (response.headers.get("content-type") || "")
-            .split(";")[0].trim().toLowerCase();
-        if (!ALLOWED_TYPES.has(mimeType)) {
-            throw new Error("Unsupported Twilio media type");
-        }
-        let buffer;
-        try {
-            const arrayBuffer = await response.arrayBuffer();
-            buffer = Buffer.from(arrayBuffer);
-        } catch {
-            throw new Error("Failed to download Twilio media: response read error");
-        }
-        if (buffer.length === 0) {
-            throw new Error("Empty Twilio media response");
-        }
-        return { buffer, mimeType, size: buffer.length };
+        return response;
     }
 }
 
