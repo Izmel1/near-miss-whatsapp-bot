@@ -115,16 +115,34 @@ async function deleteSession(userId) {
     }
 }
 
-async function getOrCreateSession(userId) {
-    const existing = await getSession(userId);
-    if (existing) return existing;
-    const session = {
+function getSessionTtlMilliseconds() {
+    const value = process.env.SESSION_TTL_MINUTES;
+    if (value === undefined) return 30 * 60 * 1000;
+    if (!/^\d+$/.test(value) || !Number.isSafeInteger(Number(value)) ||
+        Number(value) < 1 || Number(value) > 1440) {
+        throw new Error("Invalid SESSION_TTL_MINUTES: expected an integer from 1 to 1440");
+    }
+    return Number(value) * 60 * 1000;
+}
+
+function createNewSession() {
+    return {
         state: "START",
         eventId: crypto.randomUUID(),
         data: {},
         createdAt: new Date(),
         updatedAt: new Date()
     };
+}
+
+async function getOrCreateSession(userId) {
+    const ttl = getSessionTtlMilliseconds();
+    const existing = await getSession(userId);
+    if (existing && existing.state !== "COMPLETE" &&
+        Date.now() - existing.updatedAt.getTime() < ttl) {
+        return existing;
+    }
+    const session = createNewSession();
     await saveSession(userId, session);
     return session;
 }
