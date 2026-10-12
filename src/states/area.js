@@ -15,9 +15,10 @@ function handleArea(session, normalizedMessage, context) {
         return {
             reply:
                 "⚠️ La opción ingresada no es válida.\n\n" +
+                "Escribe únicamente el número de la opción." +
                 "Selecciona un área:\n\n" +
-                areaMenu + "\n\n" +
-                "Escribe únicamente el número de la opción."
+                areaMenu
+                
         };
     }
 
