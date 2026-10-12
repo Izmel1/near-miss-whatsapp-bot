@@ -83,6 +83,7 @@ app.http("webhook", {
 
         if (request.method === "POST") {
             let claimedMessageId;
+            let claimToken;
             let lockedUserId;
             let lockToken;
 
@@ -164,9 +165,10 @@ app.http("webhook", {
                         };
                     }
                     claimedMessageId = normalizedMessage.messageId;
+                    claimToken = claim.token;
                     const lock = await acquireSessionLock(normalizedMessage.userId);
                     if (lock.status === "BUSY") {
-                        await releaseMessage(claimedMessageId);
+                        await releaseMessage(claimedMessageId, claimToken);
                         claimedMessageId = undefined;
                         return { status: 503, body: "SESSION_BUSY" };
                     }
@@ -177,7 +179,7 @@ app.http("webhook", {
                         ? findMessageReceipt(persistedSession, normalizedMessage.messageId)
                         : null;
                     if (receipt) {
-                        await completeMessage(normalizedMessage.messageId, receipt.reply);
+                        await completeMessage(normalizedMessage.messageId, claimToken, receipt.reply);
                         claimedMessageId = undefined;
                         return receipt.reply !== null
                             ? twimlResponse(receipt.reply)
@@ -224,7 +226,7 @@ app.http("webhook", {
                 }
                 if (processingError) throw processingError;
                 if (isTwilio) {
-                    await completeMessage(normalizedMessage.messageId, result?.reply ?? null);
+                    await completeMessage(normalizedMessage.messageId, claimToken, result?.reply ?? null);
                     claimedMessageId = undefined;
                 }
 
@@ -249,7 +251,7 @@ app.http("webhook", {
             } catch (error) {
                 if (claimedMessageId) {
                     try {
-                        await releaseMessage(claimedMessageId);
+                        await releaseMessage(claimedMessageId, claimToken);
                     } catch {
                         context.error("Failed to release message idempotency claim");
                     }
