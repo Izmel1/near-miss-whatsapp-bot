@@ -1,4 +1,5 @@
-const { createNearMissItem } = require("./sharePointService");
+const generateFolio = require("../utils/generateFolio");
+const { createNearMissItem, findNearMissByEventId, updateNearMissFolio } = require("./sharePointService");
 const { persistEvidenceImages } = require("./evidenceService");
 
 async function submitReport(session, userId, context) {
@@ -19,20 +20,6 @@ async function submitReport(session, userId, context) {
     if (session.data.hasEvidence !== (images.length > 0)) {
         throw new Error("Invalid evidence state: hasEvidence must match images");
     }
-    const hasItemId = session.data.sharePointItemId != null;
-    const hasFolio = session.data.folio != null;
-    if (hasItemId !== hasFolio) {
-        throw new Error("Invalid persisted Near Miss state: item ID and folio must both exist");
-    }
-    if (hasItemId && (
-        (typeof session.data.sharePointItemId !== "string" && typeof session.data.sharePointItemId !== "number") ||
-        !Number.isSafeInteger(Number(session.data.sharePointItemId)) ||
-        Number(session.data.sharePointItemId) <= 0 ||
-        typeof session.data.folio !== "string" ||
-        !/^SEG-\d{4}-\d{5,}$/.test(session.data.folio)
-    )) {
-        throw new Error("Invalid persisted Near Miss state: invalid item ID or folio");
-    }
     const report = {
         eventId: session.eventId,
         fechaHoraReporte: new Date().toISOString(),
@@ -46,20 +33,52 @@ async function submitReport(session, userId, context) {
         prevention: session.data.prevention,
         hasEvidence: session.data.hasEvidence === true
     };
-    let created = {
-        id: session.data.sharePointItemId,
-        folio: session.data.folio,
-        webUrl: null
-    };
-    if (!hasItemId) {
-        try {
-            created = await createNearMissItem(report);
-        } catch (error) {
-            throw new Error("Failed to persist Near Miss: " + error.message);
+    if (session.data.folio != null && session.data.sharePointItemId == null) {
+        throw new Error("Invalid persisted Near Miss state: folio without item ID");
+    }
+    let created;
+    if (session.data.sharePointItemId != null && session.data.folio != null) {
+        created = { id: session.data.sharePointItemId, folio: session.data.folio, webUrl: null };
+        const date = new Date(session.data.fechaHoraReporte || report.fechaHoraReporte);
+        if (Number.isNaN(date.getTime())) throw new Error("Invalid report date");
+        if (generateFolio(created.id, date.getUTCFullYear()) !== created.folio) {
+            throw new Error("Near Miss folio mismatch");
+        }
+    } else {
+        created = await findNearMissByEventId(session.eventId);
+        if (!created && session.data.sharePointItemId != null) {
+            throw new Error("Persisted Near Miss item not found by EventID");
+        }
+        if (!created) {
+            try {
+                created = await createNearMissItem(report, { deferFolio: true });
+            } catch (error) {
+                if (error.nearMissCreateAmbiguous || error.nearMissConflictCandidate) {
+                    try {
+                        created = await findNearMissByEventId(session.eventId);
+                    } catch (searchError) {
+                        if (searchError.message === "Multiple Near Miss items found for EventID") throw searchError;
+                        throw error;
+                    }
+                }
+                if (!created) throw error;
+            }
+        }
+        if (session.data.sharePointItemId != null &&
+            String(session.data.sharePointItemId) !== String(created.id)) {
+            throw new Error("Persisted Near Miss item ID mismatch");
         }
         session.data.sharePointItemId = created.id;
-        session.data.folio = created.folio;
         session.updatedAt = new Date();
+        const dateValue = created.fechaHoraReporte || session.data.fechaHoraReporte || report.fechaHoraReporte;
+        const date = new Date(dateValue);
+        if (Number.isNaN(date.getTime())) throw new Error("Invalid recovered Near Miss report date");
+        session.data.fechaHoraReporte = dateValue;
+        const expectedFolio = generateFolio(created.id, date.getUTCFullYear());
+        if (created.folio && created.folio !== expectedFolio) throw new Error("Near Miss folio mismatch");
+        if (!created.folio) await updateNearMissFolio(created.id, expectedFolio);
+        created.folio = expectedFolio;
+        session.data.folio = expectedFolio;
     }
     let evidenceResults = [];
     if (images.length > 0) {

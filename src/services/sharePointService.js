@@ -223,7 +223,50 @@ async function resolveConsequenceIds(consequenceNames) {
     return ids;
 }
 
-async function createNearMissItem(report) {
+async function findNearMissByEventId(eventId) {
+    if (typeof eventId !== "string" || !eventId.trim()) throw new Error("Invalid Near Miss EventID");
+    const siteId = requireEnvironment("SHAREPOINT_SITE_ID");
+    const listId = requireEnvironment("SHAREPOINT_NEARMISS_LIST_ID");
+    const token = await getGraphAccessToken();
+    const query = new URLSearchParams({
+        "$filter": `fields/Title eq '${eventId.replace(/'/g, "''")}'`,
+        "$expand": "fields($select=Title,Folio,FechaHoraReporte)",
+        "$select": "id,fields"
+    });
+    let url = `https://graph.microsoft.com/v1.0/sites/${encodeURIComponent(siteId)}/lists/${encodeURIComponent(listId)}/items?${query}`;
+    let found = null;
+    while (url) {
+        const response = await requestWithRetry(url, {
+            method: "GET", headers: { Authorization: `Bearer ${token}` }
+        });
+        if (!response.ok) throw new Error(`Failed to find SharePoint Near Miss: HTTP ${response.status}`);
+        let payload;
+        try { payload = await response.json(); } catch {
+            throw new Error("Failed to find SharePoint Near Miss: invalid JSON response");
+        }
+        if (!Array.isArray(payload?.value)) throw new Error("Invalid Near Miss search response");
+        for (const item of payload.value) {
+            if (item?.fields?.Title !== eventId || typeof item.id !== "string") {
+                throw new Error("Invalid Near Miss search item");
+            }
+            if (found) throw new Error("Multiple Near Miss items found for EventID");
+            found = {
+                id: item.id, eventId: item.fields.Title,
+                folio: item.fields.Folio || null,
+                fechaHoraReporte: item.fields.FechaHoraReporte
+            };
+        }
+        url = payload["@odata.nextLink"] || null;
+        if (url) {
+            try {
+                if (new URL(url).origin !== "https://graph.microsoft.com") throw new Error();
+            } catch { throw new Error("Invalid Near Miss search pagination URL"); }
+        }
+    }
+    return found;
+}
+
+async function createNearMissItem(report, { deferFolio = false } = {}) {
     if (!report || typeof report !== "object" || Array.isArray(report)) {
         throw new Error("Invalid report: expected an object");
     }
@@ -296,8 +339,10 @@ async function createNearMissItem(report) {
             }, { retryable: false }
         );
     } catch (error) {
-        if (error?.code === "EXTERNAL_HTTP_TIMEOUT" || error?.message?.startsWith("Invalid EXTERNAL_HTTP_")) throw error;
-        throw new Error("Failed to create SharePoint Near Miss: network error");
+        if (error?.code === "EXTERNAL_HTTP_TIMEOUT" || error?.code === "EXTERNAL_HTTP_NETWORK") {
+            error.nearMissCreateAmbiguous = true;
+        }
+        throw error;
     }
     if (response.status !== 201) {
         let detail = "";
@@ -319,7 +364,11 @@ async function createNearMissItem(report) {
         } catch {
             // Un body ilegible mantiene el diagnóstico HTTP original.
         }
-        throw new Error(`Failed to create SharePoint Near Miss: HTTP ${response.status}${detail}`);
+        const error = new Error(`Failed to create SharePoint Near Miss: HTTP ${response.status}${detail}`);
+        error.nearMissCreateAmbiguous = [500, 502, 503, 504].includes(response.status);
+        // 400/409 no acreditan UNIQUE: solo permiten una consulta de reconciliación.
+        error.nearMissConflictCandidate = [400, 409].includes(response.status);
+        throw error;
     }
     let item;
     try {
@@ -331,6 +380,10 @@ async function createNearMissItem(report) {
         throw new Error("Failed to create SharePoint Near Miss: item ID missing or invalid");
     }
     const folio = generateFolio(item.id, reportDate.getUTCFullYear());
+    if (deferFolio) {
+        return { id: item.id, folio: item.fields?.Folio || null,
+            fechaHoraReporte: report.fechaHoraReporte, webUrl: item.webUrl || null };
+    }
     try {
         await updateNearMissFolio(item.id, folio);
     } catch (error) {
@@ -380,5 +433,6 @@ module.exports = {
     resolveAreaId,
     resolveConsequenceIds,
     createNearMissItem,
+    findNearMissByEventId,
     updateNearMissFolio
 };
