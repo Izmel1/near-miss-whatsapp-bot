@@ -1,4 +1,5 @@
 const crypto = require("crypto");
+const { pruneMessageReceipts } = require("../services/sessionMessageReceiptService");
 
 const { TableClient } = require("@azure/data-tables");
 const PARTITION_KEY = "NearMissSession";
@@ -125,14 +126,17 @@ function getSessionTtlMilliseconds() {
     return Number(value) * 60 * 1000;
 }
 
-function createNewSession() {
-    return {
+function createNewSession(previousSession) {
+    const session = {
         state: "START",
         eventId: crypto.randomUUID(),
         data: {},
         createdAt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
+        messageReceipts: previousSession?.messageReceipts || []
     };
+    pruneMessageReceipts(session);
+    return session;
 }
 
 async function getOrCreateSession(userId) {
@@ -142,7 +146,7 @@ async function getOrCreateSession(userId) {
         Date.now() - existing.updatedAt.getTime() < ttl) {
         return existing;
     }
-    const session = createNewSession();
+    const session = createNewSession(existing);
     await saveSession(userId, session);
     return session;
 }

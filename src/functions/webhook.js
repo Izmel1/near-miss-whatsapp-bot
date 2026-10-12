@@ -1,5 +1,6 @@
 const { app } = require("@azure/functions");
-const { getOrCreateSession, saveSession } = require("../session/sessionStore");
+const { getSession, getOrCreateSession, saveSession } = require("../session/sessionStore");
+const { findMessageReceipt, recordMessageReceipt } = require("../services/sessionMessageReceiptService");
 const { claimMessage, completeMessage, releaseMessage } = require("../services/messageIdempotencyService");
 const { acquireSessionLock, releaseSessionLock } = require("../services/sessionLockService");
 const processSession =
@@ -171,6 +172,17 @@ app.http("webhook", {
                     }
                     lockedUserId = normalizedMessage.userId;
                     lockToken = lock.token;
+                    const persistedSession = await getSession(normalizedMessage.userId);
+                    const receipt = persistedSession
+                        ? findMessageReceipt(persistedSession, normalizedMessage.messageId)
+                        : null;
+                    if (receipt) {
+                        await completeMessage(normalizedMessage.messageId, receipt.reply);
+                        claimedMessageId = undefined;
+                        return receipt.reply !== null
+                            ? twimlResponse(receipt.reply)
+                            : { status: 200, body: "EVENT_RECEIVED" };
+                    }
                 }
 
                 /*
@@ -198,6 +210,9 @@ app.http("webhook", {
                 let processingError;
                 try {
                     result = await processSession(session, normalizedMessage, context);
+                    if (isTwilio) {
+                        recordMessageReceipt(session, normalizedMessage.messageId, result?.reply ?? null);
+                    }
                 } catch (error) {
                     processingError = error;
                 }
