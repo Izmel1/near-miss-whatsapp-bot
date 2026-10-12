@@ -36,9 +36,9 @@ safeLog(context, "State transition", { fromState: "LOCATION", toState: "CONSEQUE
         reply:
             "✅ Ubicación registrada.\n\n" +
             "Selecciona una o varias consecuencias potenciales:\n\n" +
-            Menuconsecuencia + "\n\n" +
             "Puedes seleccionar varias opciones separadas por coma.\n" +
-            "Ejemplo: 1,2,6"
+            "Ejemplo: 1,2,6\n\n" +
+            Menuconsecuencia
     };
 }
 

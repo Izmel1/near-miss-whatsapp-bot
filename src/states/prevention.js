@@ -33,6 +33,7 @@ function handlePrevention(session, normalizedMessage, context) {
         reply:
             "✅ Medida preventiva registrada.\n\n" +
             "¿Deseas agregar fotografías como evidencia?\n\n" +
+            "Escribe únicamente el número de la opción." + 
             "1. Sí\n" +
             "2. No, enviar reporte"
     };

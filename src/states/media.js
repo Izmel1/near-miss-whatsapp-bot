@@ -84,6 +84,7 @@ function handleMedia(session, normalizedMessage, context) {
             reply:
                 `✅ ${received} (${session.data.images.length} de 5).\n\n` +
                 "¿Deseas agregar más imágenes?\n\n" +
+                "Ingresa un numero de opccion" +
                 "1. Sí\n" +
                 "2. Enviar reporte"
         };

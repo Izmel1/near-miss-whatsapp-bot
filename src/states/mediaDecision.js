@@ -53,6 +53,7 @@ function handleMediaDecision(session, normalizedMessage, context) {
         reply:
             "⚠️ Selecciona una opción válida.\n\n" +
             "¿Deseas agregar fotografías como evidencia?\n\n" +
+            "Escribe únicamente el número de la opción." +
             "1. Sí\n" +
             "2. No, enviar reporte"
     };
