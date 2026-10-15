@@ -1,5 +1,6 @@
 const { safeLog, safeError } = require("../utils/safeLogger");
 const generateFolio = require("../utils/generateFolio");
+const { getNextFolioNumber } = require("./folioCounterService");
 const { createNearMissItem, findNearMissByEventId, updateNearMissFolio } = require("./sharePointService");
 const { persistEvidenceImages } = require("./evidenceService");
 
@@ -20,6 +21,10 @@ async function submitReport(session, userId, context) {
     }
     if (session.data.hasEvidence !== (images.length > 0)) {
         throw new Error("Invalid evidence state: hasEvidence must match images");
+    }
+    const folioMode = process.env.FOLIO_MODE ?? "itemid";
+    if (folioMode !== "itemid" && folioMode !== "counter") {
+        throw new Error("Invalid FOLIO_MODE: expected itemid or counter");
     }
     const report = {
         eventId: session.eventId,
@@ -42,8 +47,12 @@ async function submitReport(session, userId, context) {
         created = { id: session.data.sharePointItemId, folio: session.data.folio, webUrl: null };
         const date = new Date(session.data.fechaHoraReporte || report.fechaHoraReporte);
         if (Number.isNaN(date.getTime())) throw new Error("Invalid report date");
-        if (generateFolio(created.id, date.getUTCFullYear()) !== created.folio) {
+        if (folioMode === "itemid" && generateFolio(created.id, date.getUTCFullYear()) !== created.folio) {
             throw new Error("Near Miss folio mismatch");
+        }
+        if (folioMode === "counter") {
+            // Reapply the same folio if an earlier PATCH failed after allocation.
+            await updateNearMissFolio(created.id, created.folio);
         }
     } else {
         created = await findNearMissByEventId(session.eventId);
@@ -75,9 +84,15 @@ async function submitReport(session, userId, context) {
         const date = new Date(dateValue);
         if (Number.isNaN(date.getTime())) throw new Error("Invalid recovered Near Miss report date");
         session.data.fechaHoraReporte = dateValue;
-        const expectedFolio = generateFolio(created.id, date.getUTCFullYear());
-        if (created.folio && created.folio !== expectedFolio) throw new Error("Near Miss folio mismatch");
-        if (!created.folio) await updateNearMissFolio(created.id, expectedFolio);
+        const year = date.getUTCFullYear();
+        const expectedFolio = folioMode === "counter"
+            ? (created.folio || generateFolio(await getNextFolioNumber(year), year))
+            : generateFolio(created.id, year);
+        if (folioMode === "itemid" && created.folio && created.folio !== expectedFolio) throw new Error("Near Miss folio mismatch");
+        if (!created.folio) {
+            if (folioMode === "counter") session.data.folio = expectedFolio;
+            await updateNearMissFolio(created.id, expectedFolio);
+        }
         created.folio = expectedFolio;
         session.data.folio = expectedFolio;
     }
