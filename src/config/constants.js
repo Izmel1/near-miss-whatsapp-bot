@@ -1,6 +1,4 @@
-// En producción lo pondremos como variable de entorno en Azure
-const VERIFY_TOKEN =
-    process.env.VERIFY_TOKEN || "nearmiss_hudson_token";
+const VERIFY_TOKEN = process.env.VERIFY_TOKEN;
 
 const CONSEQUENCES = {
     "1": "Golpe",

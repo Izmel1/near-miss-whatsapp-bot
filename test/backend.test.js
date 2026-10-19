@@ -265,3 +265,138 @@ test("22. Config CLI returns 0/1 without printing fictitious credentials", () =>
     assert.equal(invalid.status, 1, invalid.stderr);
     assert.match(invalid.stdout, /\[ERROR\] CLIENT_SECRET/);
 });
+
+// Exercise the registered HTTP handler with real signature validation,
+// normalizer, START processor and TwiML; external effects stay mocked.
+function webhookFixture(verifyToken) {
+    const calls = [];
+    let handler;
+    const forbidden = name => () => {
+        calls.push(name);
+        throw new Error("Unexpected external effect: " + name);
+    };
+    const graph = forbidden("SharePoint");
+    const processor = load("src/session/sessionProcessor.js", {
+        "../services/submitReport": graph
+    });
+    const constants = load("src/config/constants.js", {},
+        verifyToken === undefined ? {} : { VERIFY_TOKEN: verifyToken });
+    const session = { state: "START", data: {}, messageReceipts: [] };
+    load("src/functions/webhook.js", {
+        "@azure/functions": { app: { http(name, options) {
+            assert.equal(name, "webhook");
+            handler = options.handler;
+        } } },
+        "../config/constants": constants,
+        "../services/twilioWebhookValidationService": validation,
+        "../channels/meta/normalizeMetaMessage": forbidden("normalizeMetaMessage"),
+        "../channels/twilio/normalizeTwilioMessage": async request => {
+            calls.push("normalizeTwilioMessage");
+            return require("../src/channels/twilio/normalizeTwilioMessage")(request);
+        },
+        "../session/sessionStore": {
+            getSession: async () => { calls.push("getSession"); return null; },
+            getOrCreateSession: async () => { calls.push("getOrCreateSession"); return session; },
+            saveSession: async () => { calls.push("saveSession"); }
+        },
+        "../services/messageIdempotencyService": {
+            claimMessage: async () => { calls.push("claimMessage"); return { status: "CLAIMED", token: "fake-claim" }; },
+            completeMessage: async () => { calls.push("completeMessage"); },
+            releaseMessage: forbidden("releaseMessage")
+        },
+        "../services/sessionLockService": {
+            acquireSessionLock: async () => { calls.push("acquireSessionLock"); return { status: "ACQUIRED", token: "fake-lock" }; },
+            startSessionLockHeartbeat: () => {
+                calls.push("heartbeat");
+                return { throwIfFailed() {}, async stop() { calls.push("heartbeatStop"); } };
+            },
+            releaseSessionLock: async () => { calls.push("releaseSessionLock"); }
+        },
+        "../session/sessionProcessor": async (...args) => {
+            calls.push("sessionProcessor");
+            return processor(...args);
+        },
+        "../services/submitReport": graph
+    });
+    return { handler, calls, session };
+}
+
+function signedTwilioRequest() {
+    const params = { ...signatureParams, NumMedia: "0" };
+    const signature = twilio.getExpectedTwilioSignature(
+        signatureEnv.TWILIO_AUTH_TOKEN, signatureEnv.TWILIO_WEBHOOK_URL, params);
+    return {
+        method: "POST",
+        headers: new Headers({ "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8", "X-Twilio-Signature": signature }),
+        text: async () => new URLSearchParams(params).toString(),
+        json: () => assert.fail("Twilio must not parse JSON")
+    };
+}
+
+async function assertTwilioWorks(verifyToken) {
+    const fixture = webhookFixture(verifyToken);
+    const result = await fixture.handler(signedTwilioRequest(), context());
+    assert.equal(result.status, 200);
+    assert.equal(result.headers["Content-Type"], "text/xml; charset=utf-8");
+    assert.match(result.body, /<Message>.*Bienvenido/s);
+    assert.equal(fixture.session.state, "IDENTITY");
+    assert.equal(fixture.session.messageReceipts.length, 1);
+    assert.deepEqual(fixture.calls, ["normalizeTwilioMessage", "claimMessage", "acquireSessionLock",
+        "heartbeat", "getSession", "getOrCreateSession", "sessionProcessor", "saveSession",
+        "completeMessage", "heartbeatStop", "releaseSessionLock"]);
+}
+
+test("Webhook security 1: signed Twilio form preserves conversation and TwiML", () => assertTwilioWorks("fake-verify-token"));
+
+async function assertUnsupported(contentType) {
+    const fixture = webhookFixture();
+    const result = await fixture.handler({
+        method: "POST",
+        headers: new Headers(contentType ? { "Content-Type": contentType } : {}),
+        text: () => assert.fail("Unsupported body must not be read"),
+        json: () => assert.fail("Unsupported body must not be parsed")
+    }, context());
+    assert.equal(result.status, 415);
+    assert.equal(result.body, "UNSUPPORTED_MEDIA_TYPE");
+    assert.deepEqual(fixture.calls, []);
+}
+
+test("Webhook security 2: JSON is rejected before normalization, storage or SharePoint", () => assertUnsupported("application/json"));
+test("Webhook security 3: text/plain and absent Content-Type have no effects", async () => {
+    await assertUnsupported("text/plain");
+    await assertUnsupported(undefined);
+});
+
+function metaVerificationRequest(token) {
+    return { method: "GET", query: new URLSearchParams({
+        "hub.mode": "subscribe", "hub.verify_token": token, "hub.challenge": "fake-challenge"
+    }) };
+}
+
+test("Webhook security 4: configured Meta GET returns challenge for matching token", async () => {
+    const fixture = webhookFixture("fake-verify-token");
+    const result = await fixture.handler(metaVerificationRequest("fake-verify-token"), context());
+    assert.equal(result.status, 200);
+    assert.equal(result.body, "fake-challenge");
+    assert.deepEqual(fixture.calls, []);
+});
+
+test("Webhook security 5: wrong Meta GET token is forbidden", async () => {
+    const fixture = webhookFixture("fake-verify-token");
+    assert.equal((await fixture.handler(metaVerificationRequest("wrong-token"), context())).status, 403);
+    assert.deepEqual(fixture.calls, []);
+});
+
+test("Webhook security 6: absent, empty or blank VERIFY_TOKEN fails GET safely", async () => {
+    for (const token of [undefined, "", "   "]) {
+        const fixture = webhookFixture(token);
+        const ctx = context();
+        const result = await fixture.handler(metaVerificationRequest(token ?? ""), ctx);
+        assert.equal(result.status, 500);
+        assert.equal(result.body, "ERROR");
+        assert.deepEqual(fixture.calls, []);
+        assert.deepEqual(ctx.records, [{ event: "Webhook verification requested" }]);
+    }
+});
+
+test("Webhook security 7: absent VERIFY_TOKEN does not affect signed Twilio POST", () => assertTwilioWorks(undefined));

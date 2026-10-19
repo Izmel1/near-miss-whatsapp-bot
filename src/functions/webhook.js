@@ -8,8 +8,6 @@ const { acquireSessionLock, releaseSessionLock, startSessionLockHeartbeat } = re
 const processSession =
     require("../session/sessionProcessor");
 const submitReport = require("../services/submitReport");
-const normalizeMetaMessage =
-    require("../channels/meta/normalizeMetaMessage");
 const normalizeTwilioMessage =
     require("../channels/twilio/normalizeTwilioMessage");
 const twimlResponse =
@@ -49,6 +47,10 @@ app.http("webhook", {
                 request.query.get("hub.challenge");
 
             safeLog(context, "Webhook verification requested");
+
+            if (typeof VERIFY_TOKEN !== "string" || !VERIFY_TOKEN.trim()) {
+                return { status: 500, body: "ERROR" };
+            }
 
             if (
                 mode === "subscribe" &&
@@ -113,46 +115,7 @@ app.http("webhook", {
                     safeLog(context, "Twilio signature validated", { operation: "validation" });
                     normalizedMessage = await normalizeTwilioMessage({ text: async () => rawBody });
                 } else {
-                    // Meta y simulaciones: se conserva la lectura del JSON actual.
-                    const body = await request.json();
-
-                    const entry =
-                        body.entry?.[0];
-
-                    const change =
-                        entry?.changes?.[0];
-
-                    const value =
-                        change?.value;
-
-                    const message =
-                        value?.messages?.[0];
-
-                    const contact =
-                        value?.contacts?.[0];
-
-                    /*
-                    Meta también manda eventos que no contienen
-                    mensajes, por ejemplo estados.
-                    */
-
-                    if (!message) {
-
-                        safeLog(context, "Webhook event ignored");
-
-                        return {
-                            status: 200,
-                            body: "EVENT_RECEIVED"
-                        };
-                    }
-
-                    /*
-                    =================================================
-                    NORMALIZACIÓN
-                    =================================================
-                    */
-
-                    normalizedMessage = normalizeMetaMessage(message, contact);
+                    return { status: 415, body: "UNSUPPORTED_MEDIA_TYPE" };
                 }
 
                 if (!normalizedMessage.userId || !normalizedMessage.messageId) {
